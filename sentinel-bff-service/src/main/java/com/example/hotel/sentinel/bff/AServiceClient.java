@@ -12,5 +12,6 @@ public interface AServiceClient {
 
     @GetMapping("/a/work")
     ApiResponse<Map<String, Object>> work(@RequestParam(name = "slowMs", required = false) Long slowMs,
-                                          @RequestParam(name = "fail", required = false) Boolean fail);
+                                          @RequestParam(name = "fail", required = false) Boolean fail,
+                                          @RequestParam(name = "decodeFail", required = false) Boolean decodeFail);
 }

@@ -25,17 +25,20 @@ public class BffController {
     @GetMapping("/entry")
     @SentinelResource(value = "chainBffEntry", blockHandler = "entryBlocked")
     public ApiResponse<Map<String, Object>> entry(@RequestParam(name = "slowMs", required = false) Long slowMs,
-                                                  @RequestParam(name = "fail", required = false) Boolean fail) {
+                                                  @RequestParam(name = "fail", required = false) Boolean fail,
+                                                  @RequestParam(name = "decodeFail", required = false) Boolean decodeFail) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("path", "gateway -> sentinel-bff-service -> sentinel-a-service -> sentinel-b-service");
         body.put("bffTime", Instant.now().toString());
         body.put("slowMs", slowMs);
         body.put("fail", fail);
-        body.put("aResponse", aServiceClient.work(slowMs, fail));
+        body.put("decodeFail", decodeFail);
+        body.put("aResponse", aServiceClient.work(slowMs, fail, decodeFail));
         return ApiResponse.ok(body);
     }
 
-    public ApiResponse<Map<String, Object>> entryBlocked(Long slowMs, Boolean fail, BlockException ex) {
+    public ApiResponse<Map<String, Object>> entryBlocked(Long slowMs, Boolean fail, Boolean decodeFail,
+                                                         BlockException ex) {
         return ApiResponse.fail("Sentinel blocked chainBffEntry: " + ex.getClass().getSimpleName());
     }
 }

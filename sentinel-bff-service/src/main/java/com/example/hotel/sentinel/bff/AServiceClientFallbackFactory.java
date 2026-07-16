@@ -11,7 +11,7 @@ public class AServiceClientFallbackFactory implements FallbackFactory<AServiceCl
 
     @Override
     public AServiceClient create(Throwable cause) {
-        return (slowMs, fail) -> ApiResponse.fail("FallbackFactory from bff to sentinel-a-service: "
+        return (slowMs, fail, decodeFail) -> ApiResponse.fail("FallbackFactory from bff to sentinel-a-service: "
                 + cause.getClass().getSimpleName() + " - " + cause.getMessage());
     }
 }

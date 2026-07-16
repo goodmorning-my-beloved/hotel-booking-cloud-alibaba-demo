@@ -61,7 +61,7 @@ for i in {1..10}; do curl -s http://127.0.0.1:8080/api/lab-chain/entry & done; w
 被限流时会看到类似：
 
 ```text
-Sentinel block exception
+{"success":false,"message":"太多人打卡了，请稍后再试","data":null}
 ```
 
 如果你想恢复成之前说的“并发线程数不大于 150”，把规则改成：
@@ -113,6 +113,42 @@ curl -s http://127.0.0.1:8080/api/lab-chain/entry
 
 ```text
 Sentinel blocked chainBffEntry
+```
+
+### Sentinel Web 自定义兜底
+
+`/lab-chain/entry` 是 Spring MVC Web 入口资源，它由 Sentinel Web 拦截器在进入 Controller 方法前检查。
+
+这个资源被限流时，请求还没有进入 `BffController.entry(...)` 方法，所以不会调用 `@SentinelResource(value = "chainBffEntry", blockHandler = "entryBlocked")` 里的 `entryBlocked`。
+
+Web 入口资源要用全局 `BlockExceptionHandler` 自定义返回：
+
+```java
+@Component
+public class SentinelWebBlockHandler implements BlockExceptionHandler {
+
+    @Override
+    public void handle(HttpServletRequest request, HttpServletResponse response, BlockException ex) throws Exception {
+        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(response.getWriter(), ApiResponse.fail(messageOf(ex)));
+    }
+}
+```
+
+本项目的实现位置：
+
+```text
+sentinel-bff-service/src/main/java/com/example/hotel/sentinel/bff/config/SentinelWebBlockHandler.java
+```
+
+效果：
+
+```text
+Web 资源 /lab-chain/entry 被限流 -> SentinelWebBlockHandler
+方法资源 chainBffEntry 被限流或熔断 -> BffController.entryBlocked
+Feign 资源 GET:http://sentinel-b-service/b/work 被熔断 -> Feign fallbackFactory
 ```
 
 ### A 服务 Feign 异常比例熔断

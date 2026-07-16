@@ -1,0 +1,9 @@
+target/
+node_modules/
+frontend/dist/
+gateway-service/src/main/resources/static/
+.idea/
+.vscode/
+*.iml
+*.log
+.DS_Store

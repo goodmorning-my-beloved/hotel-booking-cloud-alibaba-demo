@@ -1,0 +1,35 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: payment-service
+  config:
+    import: optional:nacos:${spring.application.name}.yaml
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+      config:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        file-extension: yaml
+    sentinel:
+      eager: true
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8858}
+
+seata:
+  enabled: ${SEATA_ENABLED:true}
+  application-id: ${spring.application.name}
+  tx-service-group: hotel_tx_group
+  service:
+    vgroup-mapping:
+      hotel_tx_group: default
+    grouplist:
+      default: ${SEATA_ADDR:127.0.0.1:8091}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+docker compose ps
+
+ids="$(docker compose ps -q | tr '\n' ' ')"
+if [[ -n "${ids// }" ]]; then
+  echo
+  docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}' $ids
+fi

@@ -1,0 +1,52 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: message-service
+  config:
+    import: optional:nacos:${spring.application.name}.yaml
+  cloud:
+    function:
+      definition: bookingCreatedRabbit;bookingCreatedKafka
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+      config:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        file-extension: yaml
+    sentinel:
+      eager: true
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8858}
+    stream:
+      binders:
+        rabbit:
+          type: rabbit
+        kafka:
+          type: kafka
+      bindings:
+        bookingCreatedRabbit-in-0:
+          binder: rabbit
+          destination: hotel.booking.created
+          group: message-service
+          content-type: application/json
+        bookingCreatedKafka-in-0:
+          binder: kafka
+          destination: hotel-booking-created
+          group: message-service
+          content-type: application/json
+      kafka:
+        binder:
+          brokers: ${KAFKA_BOOTSTRAP_SERVERS:127.0.0.1:9092}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

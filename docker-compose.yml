@@ -1,0 +1,300 @@
+name: hotel-booking-sca-demo
+
+x-app-env: &app-env
+  NACOS_ADDR: nacos:8848
+  SENTINEL_DASHBOARD: sentinel-dashboard:8858
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_PORT: 5672
+  RABBITMQ_USERNAME: guest
+  RABBITMQ_PASSWORD: guest
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  SEATA_ADDR: seata-server:8091
+  SEATA_ENABLED: "true"
+
+services:
+  nacos:
+    image: nacos/nacos-server:v2.3.2
+    container_name: hotel-demo-nacos
+    profiles: ["nacos", "gateway", "sentinel", "sentinel-chain", "seata", "full"]
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: "false"
+      JVM_XMS: 256m
+      JVM_XMX: 256m
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    networks:
+      - hotel-demo
+
+  sentinel-dashboard:
+    image: bladex/sentinel-dashboard:1.8.6
+    container_name: hotel-demo-sentinel
+    profiles: ["sentinel", "sentinel-chain", "full"]
+    ports:
+      - "8858:8858"
+    networks:
+      - hotel-demo
+
+  sentinel-dashboard-proxy:
+    image: alpine/socat
+    container_name: hotel-demo-sentinel-dashboard-proxy
+    profiles: ["sentinel-chain"]
+    depends_on:
+      - sentinel-dashboard
+    command: tcp-listen:8090,fork,reuseaddr tcp-connect:sentinel-dashboard:8858
+    ports:
+      - "8090:8090"
+    networks:
+      - hotel-demo
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: hotel-demo-rabbitmq
+    profiles: ["rabbitmq", "full"]
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - hotel-demo
+
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: hotel-demo-kafka
+    profiles: ["kafka", "full"]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://127.0.0.1:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+    ports:
+      - "29092:29092"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - hotel-demo
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: hotel-demo-kafka-ui
+    profiles: ["full"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_CLUSTERS_0_NAME: hotel-demo
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports:
+      - "8090:8080"
+    networks:
+      - hotel-demo
+
+  seata-server:
+    image: seataio/seata-server:2.0.0
+    container_name: hotel-demo-seata
+    profiles: ["seata", "full"]
+    environment:
+      SEATA_IP: seata-server
+      SEATA_PORT: 8091
+      STORE_MODE: file
+    ports:
+      - "7091:7091"
+      - "8091:8091"
+    networks:
+      - hotel-demo
+
+  gateway-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: gateway-service
+    container_name: hotel-demo-gateway
+    profiles: ["nacos", "gateway", "sentinel-chain", "full"]
+    depends_on:
+      - nacos
+    environment:
+      <<: *app-env
+    ports:
+      - "8080:8080"
+    networks:
+      - hotel-demo
+
+  sentinel-bff-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: sentinel-bff-service
+    container_name: hotel-demo-sentinel-bff
+    profiles: ["sentinel-chain"]
+    depends_on:
+      - nacos
+      - sentinel-a-service
+    environment:
+      <<: *app-env
+    ports:
+      - "8086:8086"
+    networks:
+      - hotel-demo
+
+  sentinel-a-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: sentinel-a-service
+    container_name: hotel-demo-sentinel-a
+    profiles: ["sentinel-chain"]
+    depends_on:
+      - nacos
+      - sentinel-b-service
+    environment:
+      <<: *app-env
+    ports:
+      - "8087:8087"
+    networks:
+      - hotel-demo
+
+  sentinel-b-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: sentinel-b-service
+    container_name: hotel-demo-sentinel-b
+    profiles: ["sentinel-chain"]
+    depends_on:
+      - nacos
+    environment:
+      <<: *app-env
+    ports:
+      - "8088:8088"
+    networks:
+      - hotel-demo
+
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: user-service
+    container_name: hotel-demo-user
+    profiles: ["nacos", "gateway", "sentinel", "full"]
+    depends_on:
+      - nacos
+    environment:
+      <<: *app-env
+    ports:
+      - "8081:8081"
+    networks:
+      - hotel-demo
+
+  hotel-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: hotel-service
+    container_name: hotel-demo-hotel
+    profiles: ["seata", "full"]
+    depends_on:
+      - nacos
+      - seata-server
+    environment:
+      <<: *app-env
+    ports:
+      - "8082:8082"
+    networks:
+      - hotel-demo
+
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: order-service
+    container_name: hotel-demo-order
+    profiles: ["full"]
+    depends_on:
+      nacos:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      seata-server:
+        condition: service_started
+    environment:
+      <<: *app-env
+    ports:
+      - "8083:8083"
+    networks:
+      - hotel-demo
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: payment-service
+    container_name: hotel-demo-payment
+    profiles: ["seata", "full"]
+    depends_on:
+      - nacos
+      - seata-server
+    environment:
+      <<: *app-env
+    ports:
+      - "8084:8084"
+    networks:
+      - hotel-demo
+
+  message-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: message-service
+    container_name: hotel-demo-message
+    profiles: ["full"]
+    depends_on:
+      nacos:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      <<: *app-env
+    ports:
+      - "8085:8085"
+    networks:
+      - hotel-demo
+
+networks:
+  hotel-demo:
+    driver: bridge

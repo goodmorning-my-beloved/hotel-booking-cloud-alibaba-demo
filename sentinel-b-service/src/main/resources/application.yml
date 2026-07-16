@@ -1,0 +1,25 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: sentinel-b-service
+  config:
+    import: optional:nacos:${spring.application.name}.yaml
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+      config:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        file-extension: yaml
+    sentinel:
+      eager: true
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8858}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

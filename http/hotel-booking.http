@@ -1,0 +1,25 @@
+### List rooms through Gateway
+GET http://localhost:8080/api/hotels
+
+### Book a room through Gateway
+POST http://localhost:8080/api/orders/book
+Content-Type: application/json
+
+{
+  "userId": 1,
+  "roomId": 101,
+  "checkIn": "2026-07-01",
+  "checkOut": "2026-07-03"
+}
+
+### List orders
+GET http://localhost:8080/api/orders
+
+### See RabbitMQ and Kafka consumed events
+GET http://localhost:8080/api/messages/booking-events
+
+### See RabbitMQ consumed events
+GET http://localhost:8080/api/messages/booking-events/rabbitmq
+
+### See Kafka consumed events
+GET http://localhost:8080/api/messages/booking-events/kafka

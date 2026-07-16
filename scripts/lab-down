@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+docker rm -f hotel-demo-sentinel-proxy hotel-demo-user-proxy hotel-demo-sentinel-dashboard-proxy >/dev/null 2>&1 || true
+if [[ -f /tmp/hotel-demo-sentinel-proxy.pid ]]; then
+  kill "$(cat /tmp/hotel-demo-sentinel-proxy.pid)" >/dev/null 2>&1 || true
+  rm -f /tmp/hotel-demo-sentinel-proxy.pid /tmp/hotel-demo-sentinel-proxy.log
+fi
+
+docker compose --profile full --profile sentinel-chain down --remove-orphans
+
+echo "All lab containers are stopped."

@@ -268,6 +268,18 @@ sentinel-b-service:
 
 可以先给 `chainBffEntry` 或 `chainAWork` 添加流控规则，QPS 阈值设为 `1`，然后快速刷新链路请求，观察 blockHandler 或 Feign fallback 的效果。
 
+现在 `sentinel-chain` 也内置了 Nacos 动态规则演示。启动脚本会自动把规则发布到 Nacos，规则文件在：
+
+```text
+nacos-config/sentinel/
+```
+
+详细说明见：
+
+```text
+docs/sentinel-nacos-rules-and-fallbackfactory.md
+```
+
 停止：
 
 ```bash

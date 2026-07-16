@@ -17,6 +17,21 @@ spring:
       eager: true
       transport:
         dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8858}
+      datasource:
+        bff-flow:
+          nacos:
+            server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+            data-id: sentinel-bff-service-flow-rules.json
+            group-id: SENTINEL_GROUP
+            data-type: json
+            rule-type: flow
+        bff-degrade:
+          nacos:
+            server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+            data-id: sentinel-bff-service-degrade-rules.json
+            group-id: SENTINEL_GROUP
+            data-type: json
+            rule-type: degrade
 
 feign:
   sentinel:

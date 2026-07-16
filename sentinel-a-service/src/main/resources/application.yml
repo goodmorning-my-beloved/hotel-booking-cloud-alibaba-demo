@@ -17,6 +17,14 @@ spring:
       eager: true
       transport:
         dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8858}
+      datasource:
+        a-degrade:
+          nacos:
+            server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+            data-id: sentinel-a-service-degrade-rules.json
+            group-id: SENTINEL_GROUP
+            data-type: json
+            rule-type: degrade
 
 feign:
   sentinel:

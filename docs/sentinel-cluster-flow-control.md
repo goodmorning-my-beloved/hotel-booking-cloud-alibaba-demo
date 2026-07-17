@@ -8,12 +8,14 @@
 sentinel-token-server:18730
         ^
         |
-  +-----+-----+
-  |           |
-BFF 8086   BFF 8186
+  +-----+-----+----------+----------+
+  |           |          |          |
+BFF 8086   BFF 8186   A 8087    B 8088
 ```
 
-两个 BFF 实例都是 `sentinel-bff-service`，都作为 cluster client 连接独立 token server。`chainBffEntry` 的流控判断不再由每个 BFF 本机单独完成，而是由 token server 统一发令牌。
+两个 BFF 实例都是 `sentinel-bff-service`，A 服务和 B 服务也作为 cluster client 连接独立 token server。`chainBffEntry`、`chainAWork`、`chainBWork` 的流控判断都不再由本机单独完成，而是由 token server 统一发令牌。
+
+Nacos 使用 `pro` 命名空间，启动脚本会自动创建这个命名空间，并把 Sentinel 规则发布进去。
 
 ## 规则
 
@@ -21,6 +23,8 @@ Nacos 里的规则文件：
 
 ```text
 nacos-config/sentinel/sentinel-bff-service-flow-rules.json
+nacos-config/sentinel/sentinel-a-service-flow-rules.json
+nacos-config/sentinel/sentinel-b-service-flow-rules.json
 ```
 
 核心内容：
@@ -29,7 +33,7 @@ nacos-config/sentinel/sentinel-bff-service-flow-rules.json
 {
   "resource": "chainBffEntry",
   "grade": 1,
-  "count": 3,
+  "count": 6,
   "clusterMode": true,
   "clusterConfig": {
     "flowId": 1001,
@@ -42,7 +46,9 @@ nacos-config/sentinel/sentinel-bff-service-flow-rules.json
 含义：
 
 ```text
-两个 BFF 实例加起来，chainBffEntry 总通过阈值是 3 QPS。
+两个 BFF 实例加起来，chainBffEntry 总通过阈值是 6 QPS。
+A 服务 chainAWork 总通过阈值是 4 QPS。
+B 服务 chainBWork 总通过阈值是 2 QPS。
 ```
 
 ## 一键启动
@@ -72,41 +78,50 @@ gateway-service:       8080
 ./scripts/demo-sentinel-cluster-flow.sh
 ```
 
-脚本会把请求平均打到两个 BFF 实例：
+脚本会分三段发送请求：
 
 ```text
-http://127.0.0.1:8086/lab-chain/entry
-http://127.0.0.1:8186/lab-chain/entry
+BFF 阶段：平均打到 http://127.0.0.1:8086/lab-chain/entry 和 http://127.0.0.1:8186/lab-chain/entry
+A 阶段：直打 http://127.0.0.1:8087/a/work
+B 阶段：直打 http://127.0.0.1:8088/b/work
 ```
 
 预期会看到类似统计：
 
 ```text
-passed:  3
-blocked: 17
+BFF phase:
+  BFF blocked:          14
+
+A phase:
+  A service blocked:    16
+
+B phase:
+  B service blocked:    18
 ```
 
 实际数字可能因为机器速度和时间窗口略有差异，但只要能看到：
 
 ```text
 Sentinel blocked chainBffEntry: FlowException
+Sentinel blocked chainAWork: FlowException
+Sentinel blocked chainBWork: FlowException
 ```
 
-就说明 BFF 方法资源 `chainBffEntry` 被集群流控拦住了。
+就说明 BFF、A、B 的方法资源都被集群流控拦住了。
 
 ## 为什么能证明是集群流控
 
-如果是单机限流，两个 BFF 实例每个 3 QPS，总共最多可能通过 6 QPS。
+如果是单机限流，两个 BFF 实例每个 6 QPS，总共最多可能通过 12 QPS。
 
 现在规则是：
 
 ```text
 clusterMode=true
 thresholdType=1
-count=3
+count=6
 ```
 
-两个 BFF 都向同一个独立 token server 申请令牌，所以总通过量按 3 QPS 控制。
+两个 BFF 都向同一个独立 token server 申请令牌，所以 `chainBffEntry` 总通过量按 6 QPS 控制。A、B 服务虽然当前各启动一个实例，也同样走 token server；以后如果 A/B 横向扩容，多实例会天然共享同一份 `chainAWork`、`chainBWork` 集群阈值。
 
 ## 手工启动方式
 
@@ -119,7 +134,9 @@ count=3
 启动独立 token server：
 
 ```bash
-SENTINEL_CLUSTER_NAMESPACE=sentinel-bff-service \
+NACOS_NAMESPACE=pro \
+SENTINEL_CLUSTER_NAMESPACES=sentinel-bff-service,sentinel-a-service,sentinel-b-service \
+SENTINEL_CLUSTER_FLOW_RULE_DATA_IDS=sentinel-bff-service-flow-rules.json,sentinel-a-service-flow-rules.json,sentinel-b-service-flow-rules.json \
 SENTINEL_CLUSTER_SERVER_PORT=18730 \
 mvn -pl sentinel-token-server spring-boot:run
 ```
@@ -130,6 +147,7 @@ mvn -pl sentinel-token-server spring-boot:run
 SENTINEL_CLUSTER_MODE=client \
 SENTINEL_CLUSTER_SERVER_HOST=127.0.0.1 \
 SENTINEL_CLUSTER_SERVER_PORT=18730 \
+NACOS_NAMESPACE=pro \
 mvn -pl sentinel-bff-service spring-boot:run \
   -Dspring-boot.run.arguments="--server.port=8086"
 ```
@@ -140,8 +158,25 @@ mvn -pl sentinel-bff-service spring-boot:run \
 SENTINEL_CLUSTER_MODE=client \
 SENTINEL_CLUSTER_SERVER_HOST=127.0.0.1 \
 SENTINEL_CLUSTER_SERVER_PORT=18730 \
+NACOS_NAMESPACE=pro \
 mvn -pl sentinel-bff-service spring-boot:run \
   -Dspring-boot.run.arguments="--server.port=8186"
+```
+
+A 服务和 B 服务手工启动时也要带上同样的 client 和 namespace 环境变量：
+
+```bash
+SENTINEL_CLUSTER_MODE=client \
+SENTINEL_CLUSTER_SERVER_HOST=127.0.0.1 \
+SENTINEL_CLUSTER_SERVER_PORT=18730 \
+NACOS_NAMESPACE=pro \
+mvn -pl sentinel-a-service spring-boot:run
+
+SENTINEL_CLUSTER_MODE=client \
+SENTINEL_CLUSTER_SERVER_HOST=127.0.0.1 \
+SENTINEL_CLUSTER_SERVER_PORT=18730 \
+NACOS_NAMESPACE=pro \
+mvn -pl sentinel-b-service spring-boot:run
 ```
 
 如果 token server 和 BFF 不在同一台机器，把 `SENTINEL_CLUSTER_SERVER_HOST` 改成 token server 的内网 IP。
@@ -150,7 +185,7 @@ mvn -pl sentinel-bff-service spring-boot:run \
 
 `sentinel-token-server` 只做集群令牌服务，不处理业务请求。
 
-`sentinel-bff-service` 不再支持嵌入式 token server；它只通过：
+`sentinel-bff-service`、`sentinel-a-service`、`sentinel-b-service` 都只通过：
 
 ```text
 SENTINEL_CLUSTER_MODE=client

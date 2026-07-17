@@ -1,14 +1,14 @@
 [
   {
-    "resource": "chainBffEntry",
+    "resource": "chainBWork",
     "limitApp": "default",
     "grade": 1,
-    "count": 6,
+    "count": 2,
     "strategy": 0,
     "controlBehavior": 0,
     "clusterMode": true,
     "clusterConfig": {
-      "flowId": 1001,
+      "flowId": 3001,
       "thresholdType": 1,
       "fallbackToLocalWhenFail": true
     }

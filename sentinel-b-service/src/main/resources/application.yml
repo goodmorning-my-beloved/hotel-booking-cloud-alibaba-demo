@@ -10,16 +10,36 @@ spring:
     nacos:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:pro}
       config:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:pro}
         file-extension: yaml
     sentinel:
       eager: true
       transport:
         dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8858}
+      datasource:
+        b-flow:
+          nacos:
+            server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+            namespace: ${NACOS_NAMESPACE:pro}
+            data-id: sentinel-b-service-flow-rules.json
+            group-id: SENTINEL_GROUP
+            data-type: json
+            rule-type: flow
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info
+
+sentinel:
+  cluster:
+    mode: ${SENTINEL_CLUSTER_MODE:off}
+    server:
+      host: ${SENTINEL_CLUSTER_SERVER_HOST:127.0.0.1}
+      port: ${SENTINEL_CLUSTER_SERVER_PORT:18730}
+    client:
+      request-timeout: ${SENTINEL_CLUSTER_CLIENT_REQUEST_TIMEOUT:20}

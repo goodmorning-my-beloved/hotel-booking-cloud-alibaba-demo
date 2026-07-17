@@ -8,6 +8,7 @@ import com.alibaba.csp.sentinel.cluster.server.config.ServerTransportConfig;
 import com.alibaba.csp.sentinel.datasource.nacos.NacosDataSource;
 import com.alibaba.csp.sentinel.property.PropertyListener;
 import com.alibaba.csp.sentinel.slots.block.flow.FlowRule;
+import com.alibaba.nacos.api.PropertyKeyConst;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -18,9 +19,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
 import org.springframework.util.StringUtils;
 
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.Properties;
 
 @Configuration
 public class SentinelTokenServerConfig {
@@ -31,8 +34,8 @@ public class SentinelTokenServerConfig {
 
     private final ObjectMapper objectMapper;
 
-    @Value("${sentinel.token-server.namespace}")
-    private String namespace;
+    @Value("${sentinel.token-server.namespaces}")
+    private String namespaces;
 
     @Value("${sentinel.token-server.port}")
     private int tokenServerPort;
@@ -46,11 +49,14 @@ public class SentinelTokenServerConfig {
     @Value("${sentinel.token-server.nacos.server-addr}")
     private String nacosServerAddr;
 
+    @Value("${sentinel.token-server.nacos.namespace:}")
+    private String nacosNamespace;
+
     @Value("${sentinel.token-server.nacos.group-id}")
     private String nacosGroupId;
 
-    @Value("${sentinel.token-server.nacos.data-id}")
-    private String nacosDataId;
+    @Value("${sentinel.token-server.nacos.flow-rule-data-ids}")
+    private String nacosDataIds;
 
     public SentinelTokenServerConfig(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
@@ -58,52 +64,85 @@ public class SentinelTokenServerConfig {
 
     @EventListener(ApplicationReadyEvent.class)
     public void startTokenServer() throws Exception {
+        List<String> namespaceList = splitCommaSeparated(namespaces);
+        List<String> dataIdList = splitCommaSeparated(nacosDataIds);
+        if (namespaceList.isEmpty()) {
+            throw new IllegalStateException("sentinel.token-server.namespaces must not be empty");
+        }
+        if (namespaceList.size() != dataIdList.size()) {
+            throw new IllegalStateException("sentinel.token-server.namespaces count must match "
+                    + "sentinel.token-server.nacos.flow-rule-data-ids count");
+        }
+
         ClusterServerConfigManager.setEmbedded(false);
         ClusterServerConfigManager.loadGlobalTransportConfig(new ServerTransportConfig(tokenServerPort, idleSeconds));
-        ClusterServerConfigManager.loadServerNamespaceSet(Set.of(namespace));
+        ClusterServerConfigManager.loadServerNamespaceSet(new LinkedHashSet<>(namespaceList));
         ClusterServerConfigManager.loadGlobalFlowConfig(new ServerFlowConfig().setMaxAllowedQps(maxAllowedQps));
-        ClusterFlowRuleManager.registerPropertyIfAbsent(namespace);
+        namespaceList.forEach(ClusterFlowRuleManager::registerPropertyIfAbsent);
 
-        subscribeFlowRulesFromNacos();
+        for (int i = 0; i < namespaceList.size(); i++) {
+            subscribeFlowRulesFromNacos(namespaceList.get(i), dataIdList.get(i));
+        }
 
         boolean started = ClusterStateManager.setToServer();
-        log.info("Sentinel independent token server mode={}, namespace={}, tokenPort={}, nacos={}/{}, started={}",
-                ClusterStateManager.getMode(), namespace, tokenServerPort, nacosGroupId, nacosDataId, started);
+        log.info("Sentinel independent token server mode={}, namespaces={}, tokenPort={}, nacosNamespace={}, "
+                        + "nacosGroup={}, dataIds={}, started={}",
+                ClusterStateManager.getMode(), namespaceList, tokenServerPort, nacosNamespace,
+                nacosGroupId, dataIdList, started);
     }
 
-    private void subscribeFlowRulesFromNacos() throws Exception {
+    private void subscribeFlowRulesFromNacos(String namespace, String dataId) throws Exception {
         NacosDataSource<List<FlowRule>> dataSource = new NacosDataSource<>(
-                nacosServerAddr, nacosGroupId, nacosDataId, this::parseFlowRules);
+                nacosProperties(), nacosGroupId, dataId, source -> parseFlowRules(source, dataId));
 
         dataSource.getProperty().addListener(new PropertyListener<>() {
             @Override
             public void configUpdate(List<FlowRule> rules) {
-                loadClusterRules(rules, "updated");
+                loadClusterRules(namespace, rules, "updated");
             }
 
             @Override
             public void configLoad(List<FlowRule> rules) {
-                loadClusterRules(rules, "loaded");
+                loadClusterRules(namespace, rules, "loaded");
             }
         });
 
-        loadClusterRules(dataSource.loadConfig(), "initial");
+        loadClusterRules(namespace, dataSource.loadConfig(), "initial");
     }
 
-    private List<FlowRule> parseFlowRules(String source) {
+    private Properties nacosProperties() {
+        Properties properties = new Properties();
+        properties.setProperty(PropertyKeyConst.SERVER_ADDR, nacosServerAddr);
+        if (StringUtils.hasText(nacosNamespace)) {
+            properties.setProperty(PropertyKeyConst.NAMESPACE, nacosNamespace);
+        }
+        return properties;
+    }
+
+    private List<FlowRule> parseFlowRules(String source, String dataId) {
         if (!StringUtils.hasText(source)) {
             return Collections.emptyList();
         }
         try {
             return objectMapper.readValue(source, FLOW_RULE_LIST);
         } catch (Exception ex) {
-            throw new IllegalArgumentException("Failed to parse Sentinel flow rules from Nacos dataId=" + nacosDataId, ex);
+            throw new IllegalArgumentException("Failed to parse Sentinel flow rules from Nacos dataId=" + dataId, ex);
         }
     }
 
-    private void loadClusterRules(List<FlowRule> rules, String phase) {
+    private void loadClusterRules(String namespace, List<FlowRule> rules, String phase) {
         List<FlowRule> safeRules = rules == null ? Collections.emptyList() : rules;
         ClusterFlowRuleManager.loadRules(namespace, safeRules);
         log.info("Sentinel cluster flow rules {} for namespace={}, count={}", phase, namespace, safeRules.size());
+    }
+
+    private List<String> splitCommaSeparated(String value) {
+        if (!StringUtils.hasText(value)) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .toList();
     }
 }

@@ -10,8 +10,10 @@ spring:
     nacos:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:pro}
       config:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:pro}
         file-extension: yaml
     sentinel:
       eager: true
@@ -21,6 +23,7 @@ spring:
         bff-flow:
           nacos:
             server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+            namespace: ${NACOS_NAMESPACE:pro}
             data-id: sentinel-bff-service-flow-rules.json
             group-id: SENTINEL_GROUP
             data-type: json
@@ -28,6 +31,7 @@ spring:
         bff-degrade:
           nacos:
             server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+            namespace: ${NACOS_NAMESPACE:pro}
             data-id: sentinel-bff-service-degrade-rules.json
             group-id: SENTINEL_GROUP
             data-type: json

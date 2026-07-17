@@ -226,7 +226,8 @@ Sentinel blocked userSentinelLab
 学习重点：
 
 - 请求链路是 `Gateway -> sentinel-bff-service -> sentinel-a-service -> sentinel-b-service`。
-- `sentinel-token-server` 独立部署，两个 BFF 实例作为 cluster client 共享 `chainBffEntry` 总 QPS。
+- `sentinel-token-server` 独立部署，两个 BFF 实例、A 服务、B 服务都作为 cluster client 共享各自资源的集群 QPS。
+- Nacos 使用 `pro` 命名空间，启动脚本会自动创建并把 Sentinel 规则发布到 `pro`。
 - Gateway 使用 `spring-cloud-alibaba-sentinel-gateway`，路由资源是 `sentinel-chain-bff`。
 - BFF 和 A 服务都开启 `feign.sentinel.enabled=true`，通过 Feign 调下游。
 - 三个 Web 服务都用 `@SentinelResource` 暴露清晰资源名：`chainBffEntry`、`chainAWork`、`chainBWork`。
@@ -273,7 +274,7 @@ sentinel-b-service:
   /b/work
 ```
 
-可以先给 `chainBffEntry` 或 `chainAWork` 添加流控规则，QPS 阈值设为 `1`，然后快速刷新链路请求，观察 blockHandler 或 Feign fallback 的效果。
+内置集群流控规则已经覆盖 `chainBffEntry`、`chainAWork`、`chainBWork`。也可以在 Nacos 的 `pro` 命名空间里修改对应 JSON，降低 QPS 阈值后快速刷新链路请求，观察 blockHandler 或 Feign fallback 的效果。
 
 现在 `sentinel-chain` 也内置了 Nacos 动态规则演示。启动脚本会自动把规则发布到 Nacos，规则文件在：
 

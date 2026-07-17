@@ -14,10 +14,12 @@ Gateway -> sentinel-bff-service -> sentinel-a-service -> sentinel-b-service
 
 ## Nacos 规则文件
 
-启动 `sentinel-chain` 时，脚本会把下面三份配置发布到 Nacos 的 `SENTINEL_GROUP`：
+启动 `sentinel-chain` 时，脚本会自动创建 Nacos `pro` 命名空间，并把下面五份配置发布到 `pro` 命名空间的 `SENTINEL_GROUP`：
 
 ```text
 sentinel-bff-service-flow-rules.json
+sentinel-a-service-flow-rules.json
+sentinel-b-service-flow-rules.json
 sentinel-bff-service-degrade-rules.json
 sentinel-a-service-degrade-rules.json
 ```
@@ -32,24 +34,30 @@ nacos-config/sentinel/
 
 ## 规则设计
 
-### BFF 入口集群流控
+### BFF/A/B 集群流控
 
 DataId：
 
 ```text
 sentinel-bff-service-flow-rules.json
+sentinel-a-service-flow-rules.json
+sentinel-b-service-flow-rules.json
 ```
 
 资源：
 
 ```text
 chainBffEntry
+chainAWork
+chainBWork
 ```
 
 规则含义：
 
 ```text
-两个 BFF 实例加起来，chainBffEntry 总 QPS > 3 时快速失败
+两个 BFF 实例加起来，chainBffEntry 总 QPS > 6 时快速失败
+A 服务 chainAWork 总 QPS > 4 时快速失败
+B 服务 chainBWork 总 QPS > 2 时快速失败
 ```
 
 演示命令：
@@ -62,6 +70,8 @@ chainBffEntry
 
 ```text
 {"success":false,"message":"Sentinel blocked chainBffEntry: FlowException","data":null}
+{"success":false,"message":"Sentinel blocked chainAWork: FlowException","data":null}
+{"success":false,"message":"Sentinel blocked chainBWork: FlowException","data":null}
 ```
 
 这个规则开启了：
@@ -70,7 +80,7 @@ chainBffEntry
 clusterMode=true
 ```
 
-所以需要先启动独立 `sentinel-token-server`。`./scripts/lab-up sentinel-chain` 会自动启动 token server 和两个 BFF client。
+所以需要先启动独立 `sentinel-token-server`。`./scripts/lab-up sentinel-chain` 会自动启动 token server、两个 BFF client、A client 和 B client。
 
 如果你想恢复成本机 Web 入口资源限流，可以把规则改成：
 

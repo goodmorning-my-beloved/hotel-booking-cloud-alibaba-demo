@@ -2,6 +2,7 @@ name: hotel-booking-sca-demo
 
 x-app-env: &app-env
   NACOS_ADDR: nacos:8848
+  NACOS_NAMESPACE: pro
   SENTINEL_DASHBOARD: sentinel-dashboard:8858
   RABBITMQ_HOST: rabbitmq
   RABBITMQ_PORT: 5672
@@ -199,9 +200,11 @@ services:
       - nacos
     environment:
       NACOS_ADDR: nacos:8848
-      SENTINEL_CLUSTER_NAMESPACE: sentinel-bff-service
+      NACOS_NAMESPACE: pro
+      SENTINEL_CLUSTER_NAMESPACES: sentinel-bff-service,sentinel-a-service,sentinel-b-service
       SENTINEL_CLUSTER_SERVER_PORT: "18730"
       SENTINEL_CLUSTER_RULE_GROUP: SENTINEL_GROUP
+      SENTINEL_CLUSTER_FLOW_RULE_DATA_IDS: sentinel-bff-service-flow-rules.json,sentinel-a-service-flow-rules.json,sentinel-b-service-flow-rules.json
     ports:
       - "8720:8720"
       - "18730:18730"
@@ -219,8 +222,12 @@ services:
     depends_on:
       - nacos
       - sentinel-b-service
+      - sentinel-token-server
     environment:
       <<: *app-env
+      SENTINEL_CLUSTER_MODE: client
+      SENTINEL_CLUSTER_SERVER_HOST: sentinel-token-server
+      SENTINEL_CLUSTER_SERVER_PORT: "18730"
     ports:
       - "8087:8087"
     networks:
@@ -236,8 +243,12 @@ services:
     profiles: ["sentinel-chain"]
     depends_on:
       - nacos
+      - sentinel-token-server
     environment:
       <<: *app-env
+      SENTINEL_CLUSTER_MODE: client
+      SENTINEL_CLUSTER_SERVER_HOST: sentinel-token-server
+      SENTINEL_CLUSTER_SERVER_PORT: "18730"
     ports:
       - "8088:8088"
     networks:

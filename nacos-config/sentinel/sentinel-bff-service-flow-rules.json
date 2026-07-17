@@ -1,11 +1,16 @@
 [
   {
-    "resource": "/lab-chain/entry",
+    "resource": "chainBffEntry",
     "limitApp": "default",
     "grade": 1,
     "count": 3,
     "strategy": 0,
     "controlBehavior": 0,
-    "clusterMode": false
+    "clusterMode": true,
+    "clusterConfig": {
+      "flowId": 1001,
+      "thresholdType": 1,
+      "fallbackToLocalWhenFail": true
+    }
   }
 ]

@@ -1,0 +1,23 @@
+server:
+  port: 8720
+
+spring:
+  application:
+    name: sentinel-token-server
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+sentinel:
+  token-server:
+    namespace: ${SENTINEL_CLUSTER_NAMESPACE:sentinel-bff-service}
+    port: ${SENTINEL_CLUSTER_SERVER_PORT:18730}
+    idle-seconds: ${SENTINEL_CLUSTER_SERVER_IDLE_SECONDS:600}
+    max-allowed-qps: ${SENTINEL_CLUSTER_SERVER_MAX_ALLOWED_QPS:10000}
+    nacos:
+      server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+      group-id: ${SENTINEL_CLUSTER_RULE_GROUP:SENTINEL_GROUP}
+      data-id: ${SENTINEL_CLUSTER_FLOW_RULE_DATA_ID:sentinel-bff-service-flow-rules.json}

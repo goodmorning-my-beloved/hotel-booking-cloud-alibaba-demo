@@ -42,3 +42,12 @@ management:
     web:
       exposure:
         include: health,info
+
+sentinel:
+  cluster:
+    mode: ${SENTINEL_CLUSTER_MODE:off}
+    server:
+      host: ${SENTINEL_CLUSTER_SERVER_HOST:127.0.0.1}
+      port: ${SENTINEL_CLUSTER_SERVER_PORT:18730}
+    client:
+      request-timeout: ${SENTINEL_CLUSTER_CLIENT_REQUEST_TIMEOUT:20}

@@ -226,6 +226,7 @@ Sentinel blocked userSentinelLab
 学习重点：
 
 - 请求链路是 `Gateway -> sentinel-bff-service -> sentinel-a-service -> sentinel-b-service`。
+- `sentinel-token-server` 独立部署，两个 BFF 实例作为 cluster client 共享 `chainBffEntry` 总 QPS。
 - Gateway 使用 `spring-cloud-alibaba-sentinel-gateway`，路由资源是 `sentinel-chain-bff`。
 - BFF 和 A 服务都开启 `feign.sentinel.enabled=true`，通过 Feign 调下游。
 - 三个 Web 服务都用 `@SentinelResource` 暴露清晰资源名：`chainBffEntry`、`chainAWork`、`chainBWork`。
@@ -242,6 +243,12 @@ Nacos:              http://111.230.36.77:8848/nacos
 
 ```bash
 curl -s http://127.0.0.1:8080/api/lab-chain/entry
+```
+
+集群流控验证：
+
+```bash
+./scripts/demo-sentinel-cluster-flow.sh
 ```
 
 在 Sentinel Dashboard 里先多请求几次链路接口，然后观察这些应用和资源：
@@ -278,6 +285,7 @@ nacos-config/sentinel/
 
 ```text
 docs/sentinel-nacos-rules-and-fallbackfactory.md
+docs/sentinel-cluster-flow-control.md
 ```
 
 停止：

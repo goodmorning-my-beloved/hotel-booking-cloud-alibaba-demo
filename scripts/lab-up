@@ -203,18 +203,23 @@ EOF
       cat <<'EOF'
 
 Sentinel chain lab is up.
-Learn: Gateway resource, Web MVC resource, SentinelResource, Feign + Sentinel fallback.
+Learn: Gateway resource, Web MVC resource, SentinelResource, Feign + Sentinel fallback,
+and independent Sentinel cluster flow control.
 
 Open:
   Sentinel Dashboard: http://127.0.0.1:8090
   Sentinel Dashboard local direct port: http://127.0.0.1:8858
   Nacos:              http://127.0.0.1:8848/nacos
+  Token server health:http://127.0.0.1:8720/actuator/health
 
 Verify the full chain:
   curl -s http://127.0.0.1:8080/api/lab-chain/entry
 
 Expected chain:
-  Gateway -> sentinel-bff-service -> sentinel-a-service -> sentinel-b-service
+  Gateway -> one of two sentinel-bff-service instances -> sentinel-a-service -> sentinel-b-service
+
+Cluster flow control demo:
+  ./scripts/demo-sentinel-cluster-flow.sh
 
 Resources to look for in Sentinel Dashboard after a few requests:
   gateway-service: sentinel-chain-bff, /api/lab-chain/**
@@ -300,17 +305,20 @@ case "$LAB" in
     wait_http "user-service" "http://127.0.0.1:8081/actuator/health" 60
     ;;
   sentinel-chain)
-    build_modules "gateway-service,sentinel-bff-service,sentinel-a-service,sentinel-b-service"
+    build_modules "gateway-service,sentinel-token-server,sentinel-bff-service,sentinel-a-service,sentinel-b-service"
     stop_old_lab
     docker compose --profile sentinel-chain up -d nacos sentinel-dashboard sentinel-dashboard-proxy
     wait_http "Nacos" "http://127.0.0.1:8848/nacos/v1/console/health/readiness" 60
     wait_http "Sentinel Dashboard" "http://127.0.0.1:8858" 60
     wait_http "Sentinel Dashboard proxy" "http://127.0.0.1:8090" 30
     "$PWD/scripts/publish-sentinel-rules-to-nacos.sh"
-    docker compose --profile sentinel-chain up -d --build sentinel-b-service sentinel-a-service sentinel-bff-service gateway-service
+    docker compose --profile sentinel-chain up -d --build sentinel-b-service sentinel-a-service sentinel-token-server
     wait_http "sentinel-b-service" "http://127.0.0.1:8088/actuator/health" 60
     wait_http "sentinel-a-service" "http://127.0.0.1:8087/actuator/health" 60
-    wait_http "sentinel-bff-service" "http://127.0.0.1:8086/actuator/health" 60
+    wait_http "sentinel-token-server" "http://127.0.0.1:8720/actuator/health" 60
+    docker compose --profile sentinel-chain up -d --build sentinel-bff-service sentinel-bff-service-2 gateway-service
+    wait_http "sentinel-bff-service-1" "http://127.0.0.1:8086/actuator/health" 60
+    wait_http "sentinel-bff-service-2" "http://127.0.0.1:8186/actuator/health" 60
     wait_http "gateway-service" "http://127.0.0.1:8080/actuator/health" 60
     ;;
   seata)

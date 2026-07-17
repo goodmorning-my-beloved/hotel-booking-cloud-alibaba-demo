@@ -149,15 +149,62 @@ services:
       dockerfile: Dockerfile
       args:
         MODULE: sentinel-bff-service
-    container_name: hotel-demo-sentinel-bff
+    container_name: hotel-demo-sentinel-bff-1
     profiles: ["sentinel-chain"]
     depends_on:
       - nacos
+      - sentinel-token-server
       - sentinel-a-service
     environment:
       <<: *app-env
+      SENTINEL_CLUSTER_MODE: client
+      SENTINEL_CLUSTER_SERVER_HOST: sentinel-token-server
+      SENTINEL_CLUSTER_SERVER_PORT: "18730"
     ports:
       - "8086:8086"
+    networks:
+      - hotel-demo
+
+  sentinel-bff-service-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: sentinel-bff-service
+    container_name: hotel-demo-sentinel-bff-2
+    profiles: ["sentinel-chain"]
+    depends_on:
+      - nacos
+      - sentinel-token-server
+      - sentinel-a-service
+    environment:
+      <<: *app-env
+      SENTINEL_CLUSTER_MODE: client
+      SENTINEL_CLUSTER_SERVER_HOST: sentinel-token-server
+      SENTINEL_CLUSTER_SERVER_PORT: "18730"
+    ports:
+      - "8186:8086"
+    networks:
+      - hotel-demo
+
+  sentinel-token-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: sentinel-token-server
+    container_name: hotel-demo-sentinel-token-server
+    profiles: ["sentinel-chain"]
+    depends_on:
+      - nacos
+    environment:
+      NACOS_ADDR: nacos:8848
+      SENTINEL_CLUSTER_NAMESPACE: sentinel-bff-service
+      SENTINEL_CLUSTER_SERVER_PORT: "18730"
+      SENTINEL_CLUSTER_RULE_GROUP: SENTINEL_GROUP
+    ports:
+      - "8720:8720"
+      - "18730:18730"
     networks:
       - hotel-demo
 

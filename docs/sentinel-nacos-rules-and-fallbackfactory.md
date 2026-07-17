@@ -32,7 +32,7 @@ nacos-config/sentinel/
 
 ## 规则设计
 
-### BFF 入口流控
+### BFF 入口集群流控
 
 DataId：
 
@@ -43,28 +43,36 @@ sentinel-bff-service-flow-rules.json
 资源：
 
 ```text
-/lab-chain/entry
+chainBffEntry
 ```
 
 规则含义：
 
 ```text
-QPS > 3 时直接快速失败
+两个 BFF 实例加起来，chainBffEntry 总 QPS > 3 时快速失败
 ```
 
 演示命令：
 
 ```bash
-for i in {1..10}; do curl -s http://127.0.0.1:8080/api/lab-chain/entry & done; wait
+./scripts/demo-sentinel-cluster-flow.sh
 ```
 
 被限流时会看到类似：
 
 ```text
-{"success":false,"message":"太多人打卡了，请稍后再试","data":null}
+{"success":false,"message":"Sentinel blocked chainBffEntry: FlowException","data":null}
 ```
 
-如果你想恢复成之前说的“并发线程数不大于 150”，把规则改成：
+这个规则开启了：
+
+```text
+clusterMode=true
+```
+
+所以需要先启动独立 `sentinel-token-server`。`./scripts/lab-up sentinel-chain` 会自动启动 token server 和两个 BFF client。
+
+如果你想恢复成本机 Web 入口资源限流，可以把规则改成：
 
 ```json
 [
@@ -80,7 +88,7 @@ for i in {1..10}; do curl -s http://127.0.0.1:8080/api/lab-chain/entry & done; w
 ]
 ```
 
-`grade: 1` 是 QPS，`grade: 0` 是并发线程数。
+`grade: 1` 是 QPS，`grade: 0` 是并发线程数。Web 入口资源 `/lab-chain/entry` 被限流时走 `SentinelWebBlockHandler`，方法资源 `chainBffEntry` 被限流时走 `BffController.entryBlocked`。
 
 ### BFF 慢调用熔断
 

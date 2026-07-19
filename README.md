@@ -32,7 +32,7 @@ cd /opt/codex-runner/workspace/hotel-booking-sca-demo
 | `rabbitmq` | RabbitMQ | queue、exchange、routing key、发布与消费 | 低 |
 | `kafka` | Kafka | topic、producer、consumer、offset | 中偏高 |
 | `sentinel` | Nacos + Sentinel Dashboard + user-service | 资源名、限流规则、blockHandler | 中 |
-| `sentinel-chain` | Nacos + Sentinel Dashboard + Gateway + BFF + A + B | Sentinel Gateway、Sentinel Web、SentinelResource、Sentinel Feign | 中偏高 |
+| `sentinel-chain` | Nacos + Sentinel Dashboard + Prometheus + Grafana + Gateway + BFF + A + B | Sentinel 集群流控、Prometheus 指标采集、Grafana JVM/线程面板 | 中偏高 |
 | `seata` | Nacos + Seata Server + hotel-service + payment-service | Seata 控制台、客户端配置、事务组映射 | 中偏高 |
 | `full` | 全部中间件 + 6 个 Java 服务 + Kafka UI + 前端静态页 | 旧酒店预订完整链路 | 高 |
 
@@ -231,12 +231,16 @@ Sentinel blocked userSentinelLab
 - Gateway 使用 `spring-cloud-alibaba-sentinel-gateway`，路由资源是 `sentinel-chain-bff`。
 - BFF 和 A 服务都开启 `feign.sentinel.enabled=true`，通过 Feign 调下游。
 - 三个 Web 服务都用 `@SentinelResource` 暴露清晰资源名：`chainBffEntry`、`chainAWork`、`chainBWork`。
+- Prometheus 自动抓取 Gateway、token server、两个 BFF、A、B 的 `/actuator/prometheus`。
+- Grafana 自动加载 `Hotel Demo JVM and Thread Metrics` 面板，用来观察 JVM 线程数和 BFF 演示线程池指标。
 
 公网入口：
 
 ```text
 Sentinel Dashboard: http://111.230.36.77:8090
 Nacos:              http://111.230.36.77:8848/nacos
+Grafana:            http://111.230.36.77:3000  admin/admin
+Prometheus:         http://111.230.36.77:9091
 链路请求:           http://111.230.36.77:8080/api/lab-chain/entry
 ```
 
@@ -250,6 +254,18 @@ curl -s http://127.0.0.1:8080/api/lab-chain/entry
 
 ```bash
 ./scripts/demo-sentinel-cluster-flow.sh
+```
+
+Grafana 线程指标验证：
+
+```bash
+./scripts/demo-grafana-thread-metrics.sh
+```
+
+脚本会通过 Gateway 调用 BFF 的 `/lab-chain/thread-test`，让 BFF 内置演示线程池短暂变忙，然后查询 Prometheus 中的 `lab_thread_pool_active_threads`、`lab_thread_test_tasks_total`、`jvm_threads_live_threads`。打开 Grafana 后进入：
+
+```text
+Hotel Demo / Hotel Demo JVM and Thread Metrics
 ```
 
 在 Sentinel Dashboard 里先多请求几次链路接口，然后观察这些应用和资源：

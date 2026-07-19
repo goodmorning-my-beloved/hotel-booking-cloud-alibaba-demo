@@ -1,0 +1,32 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: hotel-demo-sentinel-chain
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - gateway-service:8080
+        labels:
+          instance: gateway-service
+      - targets:
+          - sentinel-token-server:8720
+        labels:
+          instance: sentinel-token-server
+      - targets:
+          - sentinel-bff-service:8086
+        labels:
+          instance: sentinel-bff-service-1
+      - targets:
+          - sentinel-bff-service-2:8086
+        labels:
+          instance: sentinel-bff-service-2
+      - targets:
+          - sentinel-a-service:8087
+        labels:
+          instance: sentinel-a-service
+      - targets:
+          - sentinel-b-service:8088
+        labels:
+          instance: sentinel-b-service

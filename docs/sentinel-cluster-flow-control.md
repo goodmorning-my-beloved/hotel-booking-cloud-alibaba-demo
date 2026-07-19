@@ -68,6 +68,8 @@ sentinel-bff-service-2:8186
 sentinel-a-service:    8087
 sentinel-b-service:    8088
 gateway-service:       8080
+Prometheus:            9091
+Grafana:               3000
 ```
 
 ## 验证集群流控
@@ -108,6 +110,59 @@ Sentinel blocked chainBWork: FlowException
 ```
 
 就说明 BFF、A、B 的方法资源都被集群流控拦住了。
+
+## 验证 Grafana JVM/线程指标
+
+`sentinel-chain` 同时会启动 Prometheus 和 Grafana。
+
+访问入口：
+
+```text
+Prometheus: http://127.0.0.1:9091
+Grafana:    http://127.0.0.1:3000
+账号密码:   admin / admin
+```
+
+Prometheus 会抓取这些服务的 `/actuator/prometheus`：
+
+```text
+gateway-service
+sentinel-token-server
+sentinel-bff-service
+sentinel-bff-service-2
+sentinel-a-service
+sentinel-b-service
+```
+
+Grafana 会自动加载这个 dashboard：
+
+```text
+Hotel Demo / Hotel Demo JVM and Thread Metrics
+```
+
+可以先运行线程指标演示脚本：
+
+```bash
+./scripts/demo-grafana-thread-metrics.sh
+```
+
+脚本会调用 Gateway 路由：
+
+```text
+http://127.0.0.1:8080/api/lab-chain/thread-test?tasks=32&busyMs=8000
+```
+
+BFF 会把任务提交到一个 8 线程的演示线程池，Prometheus 随后能看到这些指标：
+
+```text
+lab_thread_pool_active_threads
+lab_thread_pool_queue_size
+lab_thread_test_tasks_total
+jvm_threads_live_threads
+jvm_threads_states_threads
+```
+
+如果看到 `lab_thread_pool_active_threads{application="sentinel-bff-service"}` 变成 8，说明 Grafana/Prometheus 和 BFF 自定义线程池指标已经打通。
 
 ## 为什么能证明是集群流控
 

@@ -155,14 +155,40 @@ http://127.0.0.1:8080/api/lab-chain/thread-test?tasks=32&busyMs=8000
 BFF 会把任务提交到一个 8 线程的演示线程池，Prometheus 随后能看到这些指标：
 
 ```text
-lab_thread_pool_active_threads
-lab_thread_pool_queue_size
+executor_active_threads
+executor_completed_tasks_total
+executor_pool_core_threads
+executor_pool_max_threads
+executor_pool_size_threads
+executor_queue_remaining_tasks
+executor_queued_tasks
+lab_thread_test_requests_total
 lab_thread_test_tasks_total
+lab_thread_test_rejected_tasks_total
+lab_thread_test_task_duration_seconds_bucket
+lab_thread_test_task_duration_seconds_count
+lab_thread_test_task_duration_seconds_sum
+lab_thread_test_task_duration_seconds_max
 jvm_threads_live_threads
 jvm_threads_states_threads
 ```
 
-如果看到 `lab_thread_pool_active_threads{application="sentinel-bff-service"}` 变成 8，说明 Grafana/Prometheus 和 BFF 自定义线程池指标已经打通。
+Grafana 的线程池排障面板会把这些 Prometheus 序列组织成：
+
+```text
+Lab Thread Pool Saturation              活跃线程、当前线程、排队任务
+Lab Thread Throughput                   请求速率、提交速率、完成速率
+Lab Thread Rejections                   拒绝速率、最近 5 分钟拒绝量
+Lab Thread Task Duration Percentiles    p95/p99 任务耗时
+Lab Thread Task Duration Avg and Max    平均耗时、最大耗时
+Lab Thread Totals                       请求/提交/完成/拒绝累计值
+```
+
+`executor_*` 指标来自 Micrometer 标准 `ExecutorServiceMetrics` 绑定器，使用 `name="lab-thread-pool"` 标签标识这个演示线程池；`lab_thread_test_*` 是压测接口额外注册的请求、提交、拒绝和任务耗时指标。
+
+如果看到 `executor_active_threads{application="sentinel-bff-service", name="lab-thread-pool"}` 变成 8，说明 Grafana/Prometheus 和 BFF 线程池指标已经打通。
+
+指标链路是：BFF 通过 Actuator 的 `/actuator/prometheus` 暴露 Micrometer 指标，Prometheus 根据 `monitoring/prometheus/prometheus.yml` 每 5 秒主动 scrape 这些端点，Grafana 的 Prometheus 数据源再执行 PromQL 查询来画图。Prometheus 不会主动推送给 Grafana，Grafana 只是查询 Prometheus 里的时序数据。
 
 ## 为什么能证明是集群流控
 

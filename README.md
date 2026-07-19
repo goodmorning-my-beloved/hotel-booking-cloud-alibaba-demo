@@ -262,11 +262,42 @@ Grafana 线程指标验证：
 ./scripts/demo-grafana-thread-metrics.sh
 ```
 
-脚本会通过 Gateway 调用 BFF 的 `/lab-chain/thread-test`，让 BFF 内置演示线程池短暂变忙，然后查询 Prometheus 中的 `lab_thread_pool_active_threads`、`lab_thread_test_tasks_total`、`jvm_threads_live_threads`。打开 Grafana 后进入：
+脚本会通过 Gateway 调用 BFF 的 `/lab-chain/thread-test`，让 BFF 内置演示线程池短暂变忙，然后查询 Prometheus 中的线程池饱和度、吞吐、拒绝、耗时和 JVM 线程指标。打开 Grafana 后进入：
 
 ```text
 Hotel Demo / Hotel Demo JVM and Thread Metrics
 ```
+
+Grafana 里的线程池排障面板会展示 Prometheus 当前能采集到的这些 BFF 演示线程池指标：
+
+```text
+Lab Thread Pool Saturation:
+  executor_active_threads                当前正在执行任务的线程数
+  executor_pool_size_threads             当前线程池线程数
+  executor_pool_core_threads             核心线程数
+  executor_pool_max_threads              最大线程数
+  executor_queued_tasks                  当前排队任务数
+  executor_queue_remaining_tasks         队列剩余容量
+
+Lab Thread Throughput:
+  rate(lab_thread_test_requests_total)   /thread-test 接口请求速率
+  rate(lab_thread_test_tasks_total)      成功提交到线程池的任务速率
+  rate(executor_completed_tasks_total)   线程池完成任务速率
+
+Lab Thread Rejections:
+  lab_thread_test_rejected_tasks_total   拒绝任务总数
+  rate/increase(...)                     拒绝速率和最近 5 分钟拒绝量
+
+Lab Thread Task Duration:
+  lab_thread_test_task_duration_seconds_bucket  任务耗时直方图，用于 p95/p99
+  lab_thread_test_task_duration_seconds_sum     任务耗时总和，用于平均耗时
+  lab_thread_test_task_duration_seconds_count   已计时完成任务数
+  lab_thread_test_task_duration_seconds_max     最近窗口最大耗时
+```
+
+`executor_*` 指标来自 Micrometer 标准 `ExecutorServiceMetrics` 绑定器，按 `name="lab-thread-pool"` 区分这个演示线程池。`lab_thread_test_*` 是 `/lab-chain/thread-test` 压测接口额外注册的业务计数器和任务耗时 Timer，用来观察请求、提交、拒绝和任务执行耗时。
+
+采集链路是：BFF 通过 Spring Boot Actuator 在 `/actuator/prometheus` 暴露 Micrometer 指标；Prometheus 按 `monitoring/prometheus/prometheus.yml` 每 5 秒主动拉取各服务的这个端点；Grafana 的数据源指向 Prometheus，打开 dashboard 时由 Grafana 执行 PromQL 查询并展示图表。也就是说 Prometheus 不会把指标推送给 Grafana，Grafana 是从 Prometheus 查询数据。
 
 在 Sentinel Dashboard 里先多请求几次链路接口，然后观察这些应用和资源：
 

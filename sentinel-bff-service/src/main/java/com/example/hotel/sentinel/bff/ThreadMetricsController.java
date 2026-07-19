@@ -2,10 +2,9 @@ package com.example.hotel.sentinel.bff;
 
 import com.example.hotel.common.api.ApiResponse;
 import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import jakarta.annotation.PreDestroy;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -14,18 +13,13 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @RestController
 @RequestMapping("/lab-chain")
 public class ThreadMetricsController {
 
-    private static final int CORE_THREADS = 8;
     private static final int MAX_TASKS = 64;
     private static final long MAX_BUSY_MS = 10_000L;
 
@@ -35,15 +29,9 @@ public class ThreadMetricsController {
     private final Counter rejectedCounter;
     private final Timer taskTimer;
 
-    public ThreadMetricsController(MeterRegistry meterRegistry) {
-        this.executor = new ThreadPoolExecutor(
-                CORE_THREADS,
-                CORE_THREADS,
-                30L,
-                TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(256),
-                new LabThreadFactory());
-
+    public ThreadMetricsController(@Qualifier("labThreadPoolExecutor") ThreadPoolExecutor executor,
+                                   MeterRegistry meterRegistry) {
+        this.executor = executor;
         this.requestCounter = Counter.builder("lab_thread_test_requests")
                 .description("Requests accepted by the thread metrics test endpoint")
                 .register(meterRegistry);
@@ -56,19 +44,6 @@ public class ThreadMetricsController {
         this.taskTimer = Timer.builder("lab_thread_test_task_duration")
                 .description("Execution duration of thread metrics test tasks")
                 .publishPercentileHistogram()
-                .register(meterRegistry);
-
-        Gauge.builder("lab_thread_pool_active_threads", executor, ThreadPoolExecutor::getActiveCount)
-                .description("Active threads in the lab metrics executor")
-                .register(meterRegistry);
-        Gauge.builder("lab_thread_pool_current_threads", executor, ThreadPoolExecutor::getPoolSize)
-                .description("Current threads in the lab metrics executor")
-                .register(meterRegistry);
-        Gauge.builder("lab_thread_pool_queue_size", executor, pool -> pool.getQueue().size())
-                .description("Queued tasks in the lab metrics executor")
-                .register(meterRegistry);
-        Gauge.builder("lab_thread_pool_completed_tasks", executor, ThreadPoolExecutor::getCompletedTaskCount)
-                .description("Completed tasks in the lab metrics executor")
                 .register(meterRegistry);
     }
 
@@ -107,28 +82,11 @@ public class ThreadMetricsController {
         return ApiResponse.ok(body);
     }
 
-    @PreDestroy
-    public void shutdown() {
-        executor.shutdownNow();
-    }
-
     private static void sleep(long durationMs) {
         try {
             Thread.sleep(durationMs);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
-        }
-    }
-
-    private static final class LabThreadFactory implements ThreadFactory {
-        private final AtomicInteger sequence = new AtomicInteger();
-
-        @Override
-        public Thread newThread(Runnable runnable) {
-            Thread thread = new Thread(runnable);
-            thread.setName("lab-metrics-worker-" + sequence.incrementAndGet());
-            thread.setDaemon(true);
-            return thread;
         }
     }
 }

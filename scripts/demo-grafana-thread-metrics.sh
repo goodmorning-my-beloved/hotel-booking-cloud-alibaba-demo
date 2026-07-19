@@ -35,12 +35,20 @@ query_prometheus() {
 }
 
 query_prometheus \
-  "Custom active thread pool metric:" \
-  'lab_thread_pool_active_threads{application="sentinel-bff-service"}'
+  "Thread pool saturation metrics:" \
+  '{__name__=~"executor_(active_threads|queued_tasks|queue_remaining_tasks|pool_size_threads|pool_core_threads|pool_max_threads)", application="sentinel-bff-service", name="lab-thread-pool"}'
 
 query_prometheus \
-  "Custom submitted task rate:" \
-  'rate(lab_thread_test_tasks_total{application="sentinel-bff-service"}[1m])'
+  "Thread pool throughput metrics:" \
+  'label_replace(rate(lab_thread_test_requests_total{application="sentinel-bff-service"}[1m]), "metric", "requests/s", "instance", ".*") or label_replace(rate(lab_thread_test_tasks_total{application="sentinel-bff-service"}[1m]), "metric", "submitted/s", "instance", ".*") or label_replace(rate(executor_completed_tasks_total{application="sentinel-bff-service", name="lab-thread-pool"}[1m]), "metric", "completed/s", "instance", ".*")'
+
+query_prometheus \
+  "Thread pool rejection metrics:" \
+  'lab_thread_test_rejected_tasks_total{application="sentinel-bff-service"} or rate(lab_thread_test_rejected_tasks_total{application="sentinel-bff-service"}[1m])'
+
+query_prometheus \
+  "Thread task duration metrics:" \
+  'histogram_quantile(0.95, sum by (le, instance) (rate(lab_thread_test_task_duration_seconds_bucket{application="sentinel-bff-service"}[1m]))) or lab_thread_test_task_duration_seconds_max{application="sentinel-bff-service"}'
 
 query_prometheus \
   "JVM live threads:" \

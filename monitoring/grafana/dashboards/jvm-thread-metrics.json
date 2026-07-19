@@ -388,7 +388,7 @@
             "type": "prometheus",
             "uid": "hotel-demo-prometheus"
           },
-          "expr": "lab_thread_pool_active_threads{application=~\"$application\"}",
+          "expr": "executor_active_threads{application=~\"$application\", name=\"lab-thread-pool\"}",
           "legendFormat": "{{instance}} active",
           "refId": "A"
         },
@@ -397,9 +397,134 @@
             "type": "prometheus",
             "uid": "hotel-demo-prometheus"
           },
-          "expr": "lab_thread_pool_queue_size{application=~\"$application\"}",
-          "legendFormat": "{{instance}} queued",
+          "expr": "executor_pool_size_threads{application=~\"$application\", name=\"lab-thread-pool\"}",
+          "legendFormat": "{{instance}} current",
           "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotel-demo-prometheus"
+          },
+          "expr": "executor_queued_tasks{application=~\"$application\", name=\"lab-thread-pool\"}",
+          "legendFormat": "{{instance}} queued",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotel-demo-prometheus"
+          },
+          "expr": "executor_queue_remaining_tasks{application=~\"$application\", name=\"lab-thread-pool\"}",
+          "legendFormat": "{{instance}} queue remaining",
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotel-demo-prometheus"
+          },
+          "expr": "executor_pool_core_threads{application=~\"$application\", name=\"lab-thread-pool\"}",
+          "legendFormat": "{{instance}} core",
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotel-demo-prometheus"
+          },
+          "expr": "executor_pool_max_threads{application=~\"$application\", name=\"lab-thread-pool\"}",
+          "legendFormat": "{{instance}} max",
+          "refId": "F"
+        }
+      ],
+      "title": "Lab Thread Pool Saturation",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotel-demo-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotel-demo-prometheus"
+          },
+          "expr": "rate(lab_thread_test_requests_total{application=~\"$application\"}[1m])",
+          "legendFormat": "{{instance}} requests/s",
+          "refId": "A"
         },
         {
           "datasource": {
@@ -408,10 +533,438 @@
           },
           "expr": "rate(lab_thread_test_tasks_total{application=~\"$application\"}[1m])",
           "legendFormat": "{{instance}} submitted/s",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotel-demo-prometheus"
+          },
+          "expr": "rate(executor_completed_tasks_total{application=~\"$application\", name=\"lab-thread-pool\"}[1m])",
+          "legendFormat": "{{instance}} completed/s",
           "refId": "C"
         }
       ],
-      "title": "Lab Thread Test",
+      "title": "Lab Thread Throughput",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotel-demo-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotel-demo-prometheus"
+          },
+          "expr": "rate(lab_thread_test_rejected_tasks_total{application=~\"$application\"}[1m])",
+          "legendFormat": "{{instance}} rejected/s",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotel-demo-prometheus"
+          },
+          "expr": "increase(lab_thread_test_rejected_tasks_total{application=~\"$application\"}[5m])",
+          "legendFormat": "{{instance}} rejected 5m",
+          "refId": "B"
+        }
+      ],
+      "title": "Lab Thread Rejections",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotel-demo-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotel-demo-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, instance) (rate(lab_thread_test_task_duration_seconds_bucket{application=~\"$application\"}[1m])))",
+          "legendFormat": "{{instance}} p95",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotel-demo-prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, instance) (rate(lab_thread_test_task_duration_seconds_bucket{application=~\"$application\"}[1m])))",
+          "legendFormat": "{{instance}} p99",
+          "refId": "B"
+        }
+      ],
+      "title": "Lab Thread Task Duration Percentiles",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotel-demo-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotel-demo-prometheus"
+          },
+          "expr": "rate(lab_thread_test_task_duration_seconds_sum{application=~\"$application\"}[1m]) / rate(lab_thread_test_task_duration_seconds_count{application=~\"$application\"}[1m])",
+          "legendFormat": "{{instance}} avg",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotel-demo-prometheus"
+          },
+          "expr": "lab_thread_test_task_duration_seconds_max{application=~\"$application\"}",
+          "legendFormat": "{{instance}} max",
+          "refId": "B"
+        }
+      ],
+      "title": "Lab Thread Task Duration Avg and Max",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "hotel-demo-prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotel-demo-prometheus"
+          },
+          "expr": "lab_thread_test_requests_total{application=~\"$application\"}",
+          "legendFormat": "{{instance}} requests total",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotel-demo-prometheus"
+          },
+          "expr": "lab_thread_test_tasks_total{application=~\"$application\"}",
+          "legendFormat": "{{instance}} submitted total",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotel-demo-prometheus"
+          },
+          "expr": "lab_thread_test_task_duration_seconds_count{application=~\"$application\"}",
+          "legendFormat": "{{instance}} completed timed total",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotel-demo-prometheus"
+          },
+          "expr": "executor_completed_tasks_total{application=~\"$application\", name=\"lab-thread-pool\"}",
+          "legendFormat": "{{instance}} pool completed total",
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "hotel-demo-prometheus"
+          },
+          "expr": "lab_thread_test_rejected_tasks_total{application=~\"$application\"}",
+          "legendFormat": "{{instance}} rejected total",
+          "refId": "E"
+        }
+      ],
+      "title": "Lab Thread Totals",
       "type": "timeseries"
     }
   ],
@@ -462,6 +1015,6 @@
   "timezone": "",
   "title": "Hotel Demo JVM and Thread Metrics",
   "uid": "hotel-demo-jvm-threads",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

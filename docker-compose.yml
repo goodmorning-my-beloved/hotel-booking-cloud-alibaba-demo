@@ -16,7 +16,7 @@ services:
   nacos:
     image: nacos/nacos-server:v2.3.2
     container_name: hotel-demo-nacos
-    profiles: ["nacos", "gateway", "sentinel", "sentinel-chain", "seata", "full"]
+    profiles: ["nacos", "gateway", "rabbitmq", "sentinel", "sentinel-chain", "seata", "full"]
     environment:
       MODE: standalone
       NACOS_AUTH_ENABLE: "false"
@@ -170,7 +170,7 @@ services:
       args:
         MODULE: gateway-service
     container_name: hotel-demo-gateway
-    profiles: ["nacos", "gateway", "sentinel-chain", "full"]
+    profiles: ["nacos", "gateway", "rabbitmq", "sentinel-chain", "full"]
     depends_on:
       - nacos
     environment:
@@ -374,13 +374,11 @@ services:
       args:
         MODULE: message-service
     container_name: hotel-demo-message
-    profiles: ["full"]
+    profiles: ["rabbitmq", "full"]
     depends_on:
       nacos:
         condition: service_started
       rabbitmq:
-        condition: service_healthy
-      kafka:
         condition: service_healthy
     environment:
       <<: *app-env

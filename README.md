@@ -108,9 +108,11 @@ curl -s http://127.0.0.1:8080/actuator/gateway/routes
 
 学习重点：
 
-- queue 是消息暂存地。
-- exchange 负责按 routing key 分发消息。
-- producer 发布消息，consumer 拉取或订阅消息。
+- exchange 负责按 routing key 分发消息，queue 是消息暂存地。
+- 生产端用 publisher confirm 确认 Broker 已收到消息，mandatory return 发现不可路由消息。
+- exchange、queue、消息都使用持久化配置，消费者业务成功后才手动 ACK。
+- 消费端用 `messageId` 做幂等，重复消息 ACK 但不重复执行业务。
+- 消费失败时 `basicNack(requeue=false)`，消息进入死信队列。
 
 控制台：
 
@@ -122,18 +124,20 @@ guest / guest
 验证：
 
 ```bash
-curl -s -u guest:guest -H 'content-type: application/json' -XPUT \
-  http://127.0.0.1:15672/api/queues/%2F/lab.queue \
-  -d '{"durable":false}'
-
-curl -s -u guest:guest -H 'content-type: application/json' -XPOST \
-  http://127.0.0.1:15672/api/exchanges/%2F/amq.default/publish \
-  -d '{"properties":{},"routing_key":"lab.queue","payload":"hello rabbitmq lab","payload_encoding":"string"}'
-
-curl -s -u guest:guest -H 'content-type: application/json' -XPOST \
-  http://127.0.0.1:15672/api/queues/%2F/lab.queue/get \
-  -d '{"count":1,"ackmode":"ack_requeue_false","encoding":"auto"}'
+curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/normal
+curl -s -XPOST 'http://127.0.0.1:8080/api/messages/rabbitmq/demo/duplicate?messageId=MSG-DEMO-1'
+curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/dead-letter
+curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/unroutable
+curl -s http://127.0.0.1:8080/api/messages/rabbitmq/demo/status
 ```
+
+控制台观察：
+
+- `Exchanges` 里看 `hotel.booking.exchange` 和 `hotel.booking.dlx`。
+- `Queues and Streams` 里看 `hotel.booking.created.queue` 和 `hotel.booking.created.dlq`。
+- 触发 `/dead-letter` 后，`hotel.booking.created.dlq` 会出现 ready 消息。
+- 触发 `/duplicate?messageId=MSG-DEMO-1` 后，接口状态里的 `duplicated` 会增加，但业务只处理一次。
+- 触发 `/unroutable` 后，接口状态里的 `returned` 会增加，表示 mandatory return 捕获了不可路由消息。
 
 停止：
 

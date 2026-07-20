@@ -12,7 +12,7 @@ Usage: ./scripts/lab-up <lab>
 Labs:
   nacos     Nacos + user-service provider + gateway-service consumer
   gateway   Gateway + Nacos + user-service mock backend
-  rabbitmq  RabbitMQ only, with producer/consumer commands
+  rabbitmq  RabbitMQ + message-service demo for idempotency, reliability, and DLQ
   kafka     Kafka only, without Kafka UI
   sentinel  Sentinel Dashboard + user-service limit demo
   sentinel-chain  Gateway -> BFF -> A -> B Sentinel and Feign demo
@@ -140,21 +140,24 @@ EOF
       cat <<'EOF'
 
 RabbitMQ lab is up.
-Learn: queue, exchange, routing key, publish/get.
+Learn: exchange, queue, routing key, publisher confirm, manual ack, idempotency, DLQ.
 
 Open:
   RabbitMQ: http://127.0.0.1:15672  guest/guest
+  Gateway:  http://127.0.0.1:8080
 
 Verify:
-  curl -s -u guest:guest -H 'content-type: application/json' -XPUT \
-    http://127.0.0.1:15672/api/queues/%2F/lab.queue \
-    -d '{"durable":false}'
-  curl -s -u guest:guest -H 'content-type: application/json' -XPOST \
-    http://127.0.0.1:15672/api/exchanges/%2F/amq.default/publish \
-    -d '{"properties":{},"routing_key":"lab.queue","payload":"hello rabbitmq lab","payload_encoding":"string"}'
-  curl -s -u guest:guest -H 'content-type: application/json' -XPOST \
-    http://127.0.0.1:15672/api/queues/%2F/lab.queue/get \
-    -d '{"count":1,"ackmode":"ack_requeue_false","encoding":"auto"}'
+  curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/normal
+  curl -s -XPOST 'http://127.0.0.1:8080/api/messages/rabbitmq/demo/duplicate?messageId=MSG-DEMO-1'
+  curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/dead-letter
+  curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/unroutable
+  curl -s http://127.0.0.1:8080/api/messages/rabbitmq/demo/status
+
+RabbitMQ Console:
+  Queues and Streams -> hotel.booking.created.queue
+  Queues and Streams -> hotel.booking.created.dlq
+  Exchanges -> hotel.booking.exchange
+  Exchanges -> hotel.booking.dlx
 
 Stop:
   ./scripts/lab-down
@@ -295,9 +298,14 @@ case "$LAB" in
     wait_http "gateway-service" "http://127.0.0.1:8080/actuator/health" 60
     ;;
   rabbitmq)
+    build_modules "gateway-service,message-service"
     stop_old_lab
-    docker compose --profile rabbitmq up -d rabbitmq
+    docker compose --profile rabbitmq up -d nacos rabbitmq
+    wait_http "Nacos" "http://127.0.0.1:8848/nacos/v1/console/health/readiness" 60
     wait_healthy "hotel-demo-rabbitmq" 60
+    docker compose --profile rabbitmq up -d --build gateway-service message-service
+    wait_http "message-service" "http://127.0.0.1:8085/actuator/health" 60
+    wait_http "gateway-service" "http://127.0.0.1:8080/actuator/health" 60
     ;;
   kafka)
     stop_old_lab

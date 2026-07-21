@@ -2,6 +2,7 @@ package com.example.hotel.message;
 
 import com.example.hotel.common.api.ApiResponse;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -36,15 +37,24 @@ public class MessageController {
     @PostMapping("/rabbitmq/demo/dead-letter")
     public ApiResponse<RabbitMqDemoPublishResult> publishDeadLetter(
             @RequestParam(value = "messageId", required = false) String messageId) {
-        // 死信演示：消费者模拟失败并 nack(requeue=false)，消息进入 DLQ。
+        // 死信演示：消费者模拟失败并 nack(requeue=false)，消息进入 DLQ；
+        // 随后 DLQ Listener 会自动把这条死信登记为 PENDING 补偿任务。
         return ApiResponse.ok(rabbitMqDemoService.publishDeadLetter(messageId));
     }
 
-    @PostMapping("/rabbitmq/demo/dead-letter/resolve-next")
-    public ApiResponse<RabbitMqDlqResolveResult> resolveNextDeadLetter(
+    @GetMapping("/dlq/incidents")
+    public ApiResponse<List<RabbitMqDlqIncident>> dlqIncidents(
+            @RequestParam(value = "status", required = false) String status) {
+        // 人工处理前先查事故任务列表；常用 status=PENDING 找到还没补偿的 incidentId。
+        return ApiResponse.ok(rabbitMqDemoService.dlqIncidents(status));
+    }
+
+    @PostMapping("/dlq/incidents/{incidentId}/resolve")
+    public ApiResponse<RabbitMqDlqResolveResult> resolveDlqIncident(
+            @PathVariable("incidentId") String incidentId,
             @RequestParam(value = "compensationNote", required = false) String compensationNote) {
-        // DLQ 补偿演示：从死信队列取下一条消息，模拟人工排障/补偿完成后 basicAck 删除。
-        return ApiResponse.ok(rabbitMqDemoService.resolveNextDeadLetter(compensationNote));
+        // DLQ 补偿演示：按指定 incidentId 处理 PENDING 任务，而不是从队列里随便取下一条。
+        return ApiResponse.ok(rabbitMqDemoService.resolveDlqIncident(incidentId, compensationNote));
     }
 
     @PostMapping("/rabbitmq/demo/unroutable")

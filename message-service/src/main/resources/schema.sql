@@ -20,3 +20,26 @@ CREATE INDEX IF NOT EXISTS idx_mq_outbox_retry
 
 CREATE INDEX IF NOT EXISTS idx_mq_outbox_updated
     ON mq_outbox_message (updated_at);
+
+CREATE TABLE IF NOT EXISTS mq_dlq_incident (
+    incident_id VARCHAR(64) PRIMARY KEY,
+    source_key VARCHAR(256) NOT NULL,
+    queue_name VARCHAR(128) NOT NULL,
+    message_id VARCHAR(64) NULL,
+    order_id VARCHAR(64) NULL,
+    dead_letter_reason VARCHAR(128) NULL,
+    payload_json CLOB NOT NULL,
+    headers_json CLOB NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    compensation_note VARCHAR(512) NULL,
+    last_error VARCHAR(1024) NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    resolved_at TIMESTAMP NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_mq_dlq_incident_source
+    ON mq_dlq_incident (source_key);
+
+CREATE INDEX IF NOT EXISTS idx_mq_dlq_incident_status
+    ON mq_dlq_incident (status, updated_at);

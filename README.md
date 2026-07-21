@@ -116,7 +116,9 @@ curl -s http://127.0.0.1:8080/actuator/gateway/routes
 - exchange、queue、消息都使用持久化配置，消费者业务成功后才手动 ACK。
 - 消费端用 `messageId` 做幂等，重复消息 ACK 但不重复执行业务。
 - 消费失败时 `basicNack(requeue=false)`，消息进入死信队列。
-- DLQ 里的消息不要随手删除；先排障或补偿，确认业务已经处理后，再由 DLQ 处理器 `basicAck` 删除。
+- DLQ Listener 自动监听死信队列，把失败消息写入 `mq_dlq_incident`，状态为 `PENDING`。
+- DLQ 原消息只有在 PENDING 补偿任务落库成功后才 ACK 删除；如果落库失败，就 NACK 重新入 DLQ。
+- 人工排障或补偿后，调用 `POST /dlq/incidents/{incidentId}/resolve` 处理指定任务，任务状态变成 `RESOLVED`。
 
 控制台：
 
@@ -131,7 +133,8 @@ guest / guest
 curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/normal
 curl -s -XPOST 'http://127.0.0.1:8080/api/messages/rabbitmq/demo/duplicate?messageId=MSG-DEMO-1'
 curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/dead-letter
-curl -s -XPOST 'http://127.0.0.1:8080/api/messages/rabbitmq/demo/dead-letter/resolve-next?compensationNote=order%20status%20fixed%20manually'
+curl -s 'http://127.0.0.1:8080/api/messages/dlq/incidents?status=PENDING'
+curl -s -XPOST 'http://127.0.0.1:8080/api/messages/dlq/incidents/INC-替换为上一步返回的incidentId/resolve?compensationNote=order%20status%20fixed%20manually'
 curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/unroutable
 curl -s http://127.0.0.1:8080/api/messages/rabbitmq/demo/status
 ```
@@ -141,8 +144,9 @@ curl -s http://127.0.0.1:8080/api/messages/rabbitmq/demo/status
 - `Exchanges` 里看 `hotel.booking.exchange` 和 `hotel.booking.dlx`。
 - `Queues and Streams` 里看 `hotel.booking.created.queue` 和 `hotel.booking.created.dlq`。
 - 触发 `/normal` 后，接口会先返回本地消息表的 `outboxId`，随后 `/status` 里的 `recentOutboxMessages` 会从 `WAIT_CONFIRM` 变成 `SENT`。
-- 触发 `/dead-letter` 后，`hotel.booking.created.dlq` 会出现 ready 消息。
-- 触发 `/dead-letter/resolve-next` 后，服务会从 DLQ 取下一条消息，模拟补偿成功并 `basicAck`，控制台里 DLQ ready 数会减少。
+- 触发 `/dead-letter` 后，正常消费者会把消息 nack 到 DLQ，DLQ Listener 随后把它写成 `PENDING` 事故任务。
+- 查询 `/dlq/incidents?status=PENDING` 可以拿到待补偿的 `incidentId`。
+- 触发 `/dlq/incidents/{incidentId}/resolve` 后，服务模拟人工补偿成功并把这条任务标记为 `RESOLVED`。
 - 触发 `/duplicate?messageId=MSG-DEMO-1` 后，接口状态里的 `duplicated` 会增加，但业务只处理一次。
 - 触发 `/unroutable` 后，接口状态里的 `returned` 会增加，本地消息表对应记录会变成 `RETURNED`。
 
@@ -152,7 +156,8 @@ curl -s http://127.0.0.1:8080/api/messages/rabbitmq/demo/status
 生产端可靠投递 = 本地消息表先落库 + 异步 publisher confirm 回写状态 + 定时任务补偿重试。
 confirm 只证明 Broker 收到了消息；mandatory return 证明是否成功路由到队列。
 重试可能带来重复投递，所以消费者必须用 messageId 做幂等，并在业务成功后手动 ACK。
-DLQ 是失败现场，不是垃圾桶；人工排障或补偿成功后 ACK 掉 DLQ 消息，失败则继续保留或转入 parking-lot 队列。
+DLQ 是失败现场，不是工单系统；DLQ Listener 先把死信落成 PENDING 补偿任务，任务落库成功后 ACK 掉 DLQ 原消息。
+人工排障后按 incidentId resolve 指定任务，补偿成功标记 RESOLVED，失败标记 FAILED 等待再次处理或转 parking-lot。
 ```
 
 停止：

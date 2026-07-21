@@ -21,13 +21,16 @@ spring:
         dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8858}
     stream:
       binders:
+        # Spring Cloud Stream 的 binder 可以理解为“把统一消息 API 接到具体 MQ 产品”的适配器。
         rabbit:
           type: rabbit
         kafka:
           type: kafka
       bindings:
         bookingCreatedRabbit-out-0:
+          # 这条 binding 对应 OrderService 里的 streamBridge.send("bookingCreatedRabbit-out-0", event)。
           binder: rabbit
+          # 对 Rabbit binder 来说，destination 通常会映射为 RabbitMQ exchange。
           destination: hotel.booking.created
           content-type: application/json
         bookingCreatedKafka-out-0:
@@ -38,6 +41,7 @@ spring:
         binder:
           brokers: ${KAFKA_BOOTSTRAP_SERVERS:127.0.0.1:9092}
   rabbitmq:
+    # Rabbit binder 底层仍然要连接 RabbitMQ Broker，这里配置连接地址和账号。
     host: ${RABBITMQ_HOST:127.0.0.1}
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:guest}

@@ -36,6 +36,7 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
+            <!-- Spring AMQP: 提供 RabbitTemplate、@RabbitListener、Queue/Exchange/Binding 等 RabbitMQ API。 -->
             <artifactId>spring-boot-starter-amqp</artifactId>
         </dependency>
         <dependency>

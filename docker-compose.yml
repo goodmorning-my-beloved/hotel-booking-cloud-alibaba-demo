@@ -5,6 +5,7 @@ x-app-env: &app-env
   NACOS_NAMESPACE: pro
   SENTINEL_DASHBOARD: sentinel-dashboard:8858
   RABBITMQ_HOST: rabbitmq
+  # Java 服务通过 5672 连接 RabbitMQ；Web 控制台使用 15672。
   RABBITMQ_PORT: 5672
   RABBITMQ_USERNAME: guest
   RABBITMQ_PASSWORD: guest
@@ -86,16 +87,21 @@ services:
       - hotel-demo
 
   rabbitmq:
+    # management 镜像自带 RabbitMQ Broker 和 Web 控制台，适合教学演示。
     image: rabbitmq:3.13-management
     container_name: hotel-demo-rabbitmq
     profiles: ["rabbitmq", "full"]
     environment:
+      # demo 环境用 guest/guest，生产环境不要使用默认账号密码。
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     ports:
+      # AMQP 端口：Spring Boot 服务通过这个端口发送/消费消息。
       - "5672:5672"
+      # 管理控制台端口：浏览器访问 http://127.0.0.1:15672。
       - "15672:15672"
     healthcheck:
+      # 等 Broker 真正可用后再启动 message-service，减少连接失败日志。
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
@@ -337,6 +343,7 @@ services:
       nacos:
         condition: service_started
       rabbitmq:
+        # message-service 依赖 RabbitMQ，等健康检查通过后再启动更稳定。
         condition: service_healthy
       kafka:
         condition: service_healthy

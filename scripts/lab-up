@@ -300,8 +300,10 @@ case "$LAB" in
   rabbitmq)
     build_modules "gateway-service,message-service"
     stop_old_lab
+    # RabbitMQ lab 只启动 Nacos、RabbitMQ、Gateway、message-service，避免无关服务占用内存。
     docker compose --profile rabbitmq up -d nacos rabbitmq
     wait_http "Nacos" "http://127.0.0.1:8848/nacos/v1/console/health/readiness" 60
+    # RabbitMQ 先健康后再启动 Java 服务，否则启动初期容易看到连接失败重试日志。
     wait_healthy "hotel-demo-rabbitmq" 60
     docker compose --profile rabbitmq up -d --build gateway-service message-service
     wait_http "message-service" "http://127.0.0.1:8085/actuator/health" 60

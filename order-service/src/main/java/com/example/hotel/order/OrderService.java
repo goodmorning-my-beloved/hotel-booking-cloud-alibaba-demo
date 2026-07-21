@@ -61,7 +61,10 @@ public class OrderService {
             BookingResponse response = new BookingResponse(orderId, user.id(), room.id(), room.price(), payment.status());
             orders.put(orderId, response);
             BookingCreatedEvent event = new BookingCreatedEvent(orderId, user.id(), room.id(), room.price(), Instant.now());
+            // Spring Cloud Stream 写法：业务代码只认识 binding 名称，不直接操作 RabbitTemplate。
+            // bookingCreatedRabbit-out-0 在 application.yml 里绑定到 RabbitMQ 的 hotel.booking.created destination。
             streamBridge.send("bookingCreatedRabbit-out-0", event);
+            // 同一个业务事件也发到 Kafka，保留给完整链路对比学习；RabbitMQ demo 接口不依赖这行。
             streamBridge.send("bookingCreatedKafka-out-0", event);
             return response;
         } catch (RuntimeException ex) {

@@ -22,29 +22,34 @@ public class MessageController {
     @PostMapping("/rabbitmq/demo/normal")
     public ApiResponse<RabbitMqDemoPublishResult> publishNormal(
             @RequestParam(value = "messageId", required = false) String messageId) {
+        // 普通可靠投递演示：persistent message + publisher confirm + consumer manual ack。
         return ApiResponse.ok(rabbitMqDemoService.publishNormal(messageId));
     }
 
     @PostMapping("/rabbitmq/demo/duplicate")
     public ApiResponse<List<RabbitMqDemoPublishResult>> publishDuplicate(
             @RequestParam(value = "messageId", required = false) String messageId) {
+        // 幂等演示：连续发送两条相同 messageId 的消息，消费者只执行业务一次。
         return ApiResponse.ok(rabbitMqDemoService.publishDuplicate(messageId));
     }
 
     @PostMapping("/rabbitmq/demo/dead-letter")
     public ApiResponse<RabbitMqDemoPublishResult> publishDeadLetter(
             @RequestParam(value = "messageId", required = false) String messageId) {
+        // 死信演示：消费者模拟失败并 nack(requeue=false)，消息进入 DLQ。
         return ApiResponse.ok(rabbitMqDemoService.publishDeadLetter(messageId));
     }
 
     @PostMapping("/rabbitmq/demo/unroutable")
     public ApiResponse<RabbitMqDemoPublishResult> publishUnroutable(
             @RequestParam(value = "messageId", required = false) String messageId) {
+        // 不可路由演示：routing key 没有绑定队列，mandatory return 会把问题反馈给生产者。
         return ApiResponse.ok(rabbitMqDemoService.publishUnroutable(messageId));
     }
 
     @GetMapping("/rabbitmq/demo/status")
     public ApiResponse<RabbitMqDemoStatus> rabbitMqDemoStatus() {
+        // 状态接口用于把发布、确认、退回、消费、重复、死信计数串起来观察。
         return ApiResponse.ok(rabbitMqDemoService.status());
     }
 }

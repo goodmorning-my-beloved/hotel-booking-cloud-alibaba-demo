@@ -20,17 +20,23 @@ spring:
       transport:
         dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8858}
   rabbitmq:
+    # RabbitMQ Broker 地址；Docker profile 启动时由 RABBITMQ_HOST=rabbitmq 指向容器名。
     host: ${RABBITMQ_HOST:127.0.0.1}
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:guest}
     password: ${RABBITMQ_PASSWORD:guest}
+    # 开启 publisher confirm。correlated 表示用 CorrelationData 关联“哪条消息”的 ack/nack。
     publisher-confirm-type: correlated
+    # 开启 publisher return。配合 template.mandatory=true 捕获“到达 exchange 但没有路由到 queue”的消息。
     publisher-returns: true
     template:
+      # mandatory=true 是不可路由消息能被 return callback 感知的关键开关。
       mandatory: true
     listener:
       simple:
+        # 消费者手动 ACK：业务成功后 basicAck，失败时 basicNack/basicReject。
         acknowledge-mode: manual
+        # 默认不要把监听器异常重新入队，避免失败消息无限重试；本 demo 里显式 nack 进 DLQ。
         default-requeue-rejected: false
 
 management:

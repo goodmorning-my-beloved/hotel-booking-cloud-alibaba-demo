@@ -4,6 +4,17 @@ server:
 spring:
   application:
     name: message-service
+  datasource:
+    # RabbitMQ demo 的本地消息表使用文件型 H2，方便学习时重启服务后继续观察 outbox 记录。
+    # 面试回答时要强调：生产环境本地消息表应换成 MySQL 等业务库，并和订单等业务数据放在同一个数据库事务里。
+    url: ${MESSAGE_DB_URL:jdbc:h2:file:./data/message-service;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false}
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  sql:
+    init:
+      # 启动 message-service 时自动创建 mq_outbox_message 表。
+      mode: always
   config:
     import: optional:nacos:${spring.application.name}.yaml
   cloud:

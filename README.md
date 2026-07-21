@@ -109,7 +109,10 @@ curl -s http://127.0.0.1:8080/actuator/gateway/routes
 学习重点：
 
 - exchange 负责按 routing key 分发消息，queue 是消息暂存地。
-- 生产端用 publisher confirm 确认 Broker 已收到消息，mandatory return 发现不可路由消息。
+- 生产端先写本地消息表 `mq_outbox_message`，再异步发送 RabbitMQ，避免“业务成功但消息没有记录”。
+- publisher confirm 使用异步回调更新本地消息表：Broker ack 后标记 `SENT`，nack 或超时后进入 `RETRYING`。
+- 定时重试任务会扫描 `RETRYING` 和 confirm 超时的消息，按 `attempt_count` 做有限次数补偿。
+- mandatory return 发现“消息到达 exchange 但没有路由到 queue”，本地消息表标记 `RETURNED`，这种通常要修 binding/routing key 后再人工补偿。
 - exchange、queue、消息都使用持久化配置，消费者业务成功后才手动 ACK。
 - 消费端用 `messageId` 做幂等，重复消息 ACK 但不重复执行业务。
 - 消费失败时 `basicNack(requeue=false)`，消息进入死信队列。
@@ -135,9 +138,18 @@ curl -s http://127.0.0.1:8080/api/messages/rabbitmq/demo/status
 
 - `Exchanges` 里看 `hotel.booking.exchange` 和 `hotel.booking.dlx`。
 - `Queues and Streams` 里看 `hotel.booking.created.queue` 和 `hotel.booking.created.dlq`。
+- 触发 `/normal` 后，接口会先返回本地消息表的 `outboxId`，随后 `/status` 里的 `recentOutboxMessages` 会从 `WAIT_CONFIRM` 变成 `SENT`。
 - 触发 `/dead-letter` 后，`hotel.booking.created.dlq` 会出现 ready 消息。
 - 触发 `/duplicate?messageId=MSG-DEMO-1` 后，接口状态里的 `duplicated` 会增加，但业务只处理一次。
-- 触发 `/unroutable` 后，接口状态里的 `returned` 会增加，表示 mandatory return 捕获了不可路由消息。
+- 触发 `/unroutable` 后，接口状态里的 `returned` 会增加，本地消息表对应记录会变成 `RETURNED`。
+
+面试表达可以这样串起来：
+
+```text
+生产端可靠投递 = 本地消息表先落库 + 异步 publisher confirm 回写状态 + 定时任务补偿重试。
+confirm 只证明 Broker 收到了消息；mandatory return 证明是否成功路由到队列。
+重试可能带来重复投递，所以消费者必须用 messageId 做幂等，并在业务成功后手动 ACK。
+```
 
 停止：
 

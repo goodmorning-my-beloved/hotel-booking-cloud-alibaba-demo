@@ -1,6 +1,7 @@
 package com.example.hotel.message;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * RabbitMQ demo 的内存状态快照。
@@ -17,6 +18,8 @@ import java.util.List;
  * @param consumed 业务成功消费并 ack 的数量。
  * @param duplicated 被幂等逻辑识别为重复并直接 ack 的数量。
  * @param rejectedToDeadLetter 被 nack(requeue=false) 打入死信队列的数量。
+ * @param outboxStatusCounts 本地消息表按状态聚合的数量。
+ * @param recentOutboxMessages 最近的本地消息表记录，用于观察异步 confirm 和重试结果。
  * @param processedMessageIds 已经成功处理过的 messageId 集合。
  * @param recentEvents 最近的消费事件，便于观察每条消息的处理结果。
  */
@@ -31,6 +34,8 @@ public record RabbitMqDemoStatus(
         long consumed,
         long duplicated,
         long rejectedToDeadLetter,
+        Map<String, Long> outboxStatusCounts,
+        List<RabbitMqOutboxMessage> recentOutboxMessages,
         List<String> processedMessageIds,
         List<RabbitMqConsumedEvent> recentEvents
 ) {

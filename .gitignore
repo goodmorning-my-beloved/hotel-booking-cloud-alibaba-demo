@@ -2,6 +2,7 @@ target/
 node_modules/
 frontend/dist/
 gateway-service/src/main/resources/static/
+data/
 .idea/
 .vscode/
 *.iml

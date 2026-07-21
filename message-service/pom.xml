@@ -41,6 +41,17 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
+            <!-- JDBC 用来演示“本地消息表 / Outbox”：先落库，再异步投递 MQ，confirm 回调再更新状态。 -->
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <!-- demo 使用嵌入式 H2，避免学习 RabbitMQ 时还必须额外准备 MySQL；生产环境应换成业务库。 -->
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
     </dependencies>

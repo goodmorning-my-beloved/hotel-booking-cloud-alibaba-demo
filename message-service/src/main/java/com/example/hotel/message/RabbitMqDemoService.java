@@ -9,10 +9,12 @@ import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -20,8 +22,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Service
@@ -30,9 +30,20 @@ public class RabbitMqDemoService {
     private static final Logger log = LoggerFactory.getLogger(RabbitMqDemoService.class);
     // 只保留最近的消费事件，避免 /status 接口返回无限增长的数据。
     private static final int MAX_RECENT_EVENTS = 50;
+    // 本地消息表最多保留给状态接口展示的最近记录数。
+    private static final int MAX_RECENT_OUTBOX_MESSAGES = 20;
+    // demo 里最多尝试 3 次投递。生产环境通常会把最大次数、退避时间配置化。
+    private static final int MAX_PUBLISH_ATTEMPTS = 3;
+    private static final int RETRY_BATCH_SIZE = 20;
+    // confirm 长时间没回来时，重试任务会把它当作“结果未知”处理并重新投递。
+    // 这可能造成重复消息，所以消费端幂等是可靠投递方案的必要组成部分。
+    private static final Duration CONFIRM_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration BASE_RETRY_BACKOFF = Duration.ofSeconds(5);
 
     // RabbitTemplate 是 Spring AMQP 的生产者工具类，负责把 Java 对象发送到 RabbitMQ。
     private final RabbitTemplate rabbitTemplate;
+    // 本地消息表负责记录“要发什么、发到哪里、当前是否成功、失败后何时重试”。
+    private final RabbitMqOutboxRepository outboxRepository;
     // 下面这些计数器只是 demo 状态展示，帮助你把接口调用和 RabbitMQ 控制台变化对应起来。
     private final AtomicLong published = new AtomicLong();
     private final AtomicLong publishAcked = new AtomicLong();
@@ -45,12 +56,18 @@ public class RabbitMqDemoService {
     // ArrayList 不是线程安全的，读写时在 record/status 里用 synchronized 保护。
     private final List<RabbitMqConsumedEvent> recentEvents = new ArrayList<>();
 
-    public RabbitMqDemoService(RabbitTemplate rabbitTemplate) {
+    public RabbitMqDemoService(RabbitTemplate rabbitTemplate, RabbitMqOutboxRepository outboxRepository) {
         this.rabbitTemplate = rabbitTemplate;
+        this.outboxRepository = outboxRepository;
         // mandatory=true 且消息到达 exchange 但没有匹配队列时，会触发 returns callback。
         // 这能演示“消息到了交换机，却没有进任何队列”的不可路由问题。
         this.rabbitTemplate.setReturnsCallback(returnedMessage -> {
             returned.incrementAndGet();
+            Object outboxId = returnedMessage.getMessage().getMessageProperties().getHeaders().get("x-outbox-id");
+            if (outboxId != null) {
+                outboxRepository.markReturned(outboxId.toString(),
+                        "mandatory return: " + returnedMessage.getReplyCode() + " " + returnedMessage.getReplyText());
+            }
             log.warn("RabbitMQ returned message. exchange={}, routingKey={}, replyCode={}, replyText={}",
                     returnedMessage.getExchange(),
                     returnedMessage.getRoutingKey(),
@@ -121,8 +138,21 @@ public class RabbitMqDemoService {
                 consumed.get(),
                 duplicated.get(),
                 rejectedToDeadLetter.get(),
+                outboxRepository.countByStatus(),
+                outboxRepository.recent(MAX_RECENT_OUTBOX_MESSAGES),
                 ids,
                 events);
+    }
+
+    @Scheduled(fixedDelay = 5_000)
+    public void retryPublishFailures() {
+        // 定时任务只处理生产端投递失败：例如 RabbitMQ 暂时不可用、Broker 返回 nack、confirm 超时。
+        // 不可路由 RETURNED 通常说明 exchange/binding/routing key 配错，盲目重试同一条路由没有意义。
+        Instant now = Instant.now();
+        outboxRepository.findConfirmTimedOut(now.minus(CONFIRM_TIMEOUT), RETRY_BATCH_SIZE)
+                .forEach(task -> scheduleRetryOrFail(task.outboxId(), "publisher confirm timeout"));
+        outboxRepository.findRetryable(now, RETRY_BATCH_SIZE)
+                .forEach(this::publishOutboxTask);
     }
 
     @RabbitListener(queues = RabbitMqDemoConfig.BOOKING_QUEUE, ackMode = "MANUAL")
@@ -158,51 +188,88 @@ public class RabbitMqDemoService {
     }
 
     private RabbitMqDemoPublishResult publish(RabbitMqBookingMessage message, String routingKey, String note) {
-        // CorrelationData 用 messageId 关联本次发送和 Broker confirm 回调结果。
-        CorrelationData correlationData = new CorrelationData(message.messageId());
+        // 标准可靠投递流程第一步：先写本地消息表，再发 MQ。
+        // 这里的 outboxId 是“本次投递记录”的 ID，messageId 是“业务幂等”的 ID，两者不要混用。
+        String outboxId = UUID.randomUUID().toString();
+        RabbitMqOutboxPublishTask task = outboxRepository.insertNew(
+                outboxId,
+                message,
+                RabbitMqDemoConfig.BOOKING_EXCHANGE,
+                routingKey,
+                note,
+                MAX_PUBLISH_ATTEMPTS);
+        publishOutboxTask(task);
+        RabbitMqOutboxMessage localMessage = outboxRepository.findById(outboxId);
+        return new RabbitMqDemoPublishResult(
+                outboxId,
+                message.messageId(),
+                message.orderId(),
+                RabbitMqDemoConfig.BOOKING_EXCHANGE,
+                routingKey,
+                true,
+                localMessage.status(),
+                "async publisher confirm pending, check /rabbitmq/demo/status by outboxId",
+                localMessage.attemptCount(),
+                note);
+    }
+
+    private void publishOutboxTask(RabbitMqOutboxPublishTask task) {
+        // 每次真正调用 RabbitTemplate 前先把状态改成 WAIT_CONFIRM，并递增 attempt_count。
+        // 如果 JVM 在这里之后宕机，重启后的超时扫描可以发现 WAIT_CONFIRM 并补偿重试。
+        outboxRepository.markWaitConfirm(task.outboxId());
+        CorrelationData correlationData = new CorrelationData(task.outboxId());
+        registerAsyncConfirm(task.outboxId(), correlationData);
         try {
-            rabbitTemplate.convertAndSend(RabbitMqDemoConfig.BOOKING_EXCHANGE, routingKey, message, amqpMessage -> {
+            rabbitTemplate.convertAndSend(task.exchangeName(), task.routingKey(), task.payload(), amqpMessage -> {
                 // messageId 放在 AMQP 标准属性里，消费者可直接读取，用来做幂等判断。
-                amqpMessage.getMessageProperties().setMessageId(message.messageId());
+                amqpMessage.getMessageProperties().setMessageId(task.payload().messageId());
                 // PERSISTENT 表示消息持久化；它要和 durable exchange/queue、publisher confirm 配合使用。
                 amqpMessage.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
+                // outboxId 放到 header，mandatory return 回调才能知道要更新本地消息表的哪一行。
+                amqpMessage.getMessageProperties().setHeader("x-outbox-id", task.outboxId());
                 // 自定义 header 只是教学说明，RabbitMQ 控制台查看消息时能看到本次演示点。
-                amqpMessage.getMessageProperties().setHeader("x-demo-feature", note);
+                amqpMessage.getMessageProperties().setHeader("x-demo-feature", task.demoNote());
                 return amqpMessage;
             }, correlationData);
             published.incrementAndGet();
-            // confirm 只说明 Broker 是否接收了消息；能否路由到队列还要看 mandatory return。
-            String confirm = waitForConfirm(correlationData);
-            return new RabbitMqDemoPublishResult(
-                    message.messageId(),
-                    message.orderId(),
-                    RabbitMqDemoConfig.BOOKING_EXCHANGE,
-                    routingKey,
-                    true,
-                    confirm,
-                    note);
         } catch (AmqpException ex) {
-            throw new IllegalStateException("RabbitMQ publish failed: " + ex.getMessage(), ex);
+            // RabbitMQ 暂时不可用、连接失败等异常不会让接口丢失消息，因为本地消息表已经有记录。
+            // 定时任务会根据 attempt_count 和 next_retry_at 继续补偿。
+            scheduleRetryOrFail(task.outboxId(), "send exception: " + ex.getMessage());
         }
     }
 
-    private String waitForConfirm(CorrelationData correlationData) {
-        try {
-            // publisher confirm 是异步结果；这里最多等 5 秒，方便接口响应里直接展示 ack/nack。
-            CorrelationData.Confirm confirm = correlationData.getFuture().get(5, TimeUnit.SECONDS);
+    private void registerAsyncConfirm(String outboxId, CorrelationData correlationData) {
+        // publisher confirm 本身就是异步模型：Broker 处理完后回调 ack/nack。
+        // 生产端不能靠接口线程同步阻塞等待，否则吞吐会很差，也不符合常见面试标准方案。
+        correlationData.getFuture().whenComplete((confirm, throwable) -> {
+            if (throwable != null) {
+                scheduleRetryOrFail(outboxId, "confirm callback failed: " + throwable.getMessage());
+                return;
+            }
             if (confirm.isAck()) {
                 publishAcked.incrementAndGet();
-                return "broker ack";
+                outboxRepository.markSent(outboxId);
+                log.info("RabbitMQ publisher confirm ack: outboxId={}", outboxId);
+                return;
             }
-            return "broker nack: " + confirm.getReason();
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            return "confirm interrupted";
-        } catch (TimeoutException ex) {
-            return "confirm timeout";
-        } catch (Exception ex) {
-            return "confirm failed: " + ex.getMessage();
+            scheduleRetryOrFail(outboxId, "broker nack: " + confirm.getReason());
+        });
+    }
+
+    private void scheduleRetryOrFail(String outboxId, String reason) {
+        int attemptCount = outboxRepository.attemptCount(outboxId);
+        if (attemptCount >= MAX_PUBLISH_ATTEMPTS) {
+            outboxRepository.markFailed(outboxId, reason + ", max attempts reached");
+            log.warn("RabbitMQ publish failed permanently: outboxId={}, attempts={}, reason={}",
+                    outboxId, attemptCount, reason);
+            return;
         }
+        // 简单递增退避：第 1 次失败 5 秒后重试，第 2 次失败 10 秒后重试。
+        Instant nextRetryAt = Instant.now().plus(BASE_RETRY_BACKOFF.multipliedBy(Math.max(1, attemptCount)));
+        outboxRepository.markRetrying(outboxId, reason, nextRetryAt);
+        log.warn("RabbitMQ publish scheduled for retry: outboxId={}, attempts={}, nextRetryAt={}, reason={}",
+                outboxId, attemptCount, nextRetryAt, reason);
     }
 
     private RabbitMqBookingMessage newMessage(String messageId, boolean fail) {

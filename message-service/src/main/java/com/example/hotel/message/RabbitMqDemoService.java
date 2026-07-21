@@ -1,6 +1,8 @@
 package com.example.hotel.message;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.GetResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;
@@ -19,6 +21,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,6 +45,7 @@ public class RabbitMqDemoService {
 
     // RabbitTemplate 是 Spring AMQP 的生产者工具类，负责把 Java 对象发送到 RabbitMQ。
     private final RabbitTemplate rabbitTemplate;
+    private final ObjectMapper objectMapper;
     // 本地消息表负责记录“要发什么、发到哪里、当前是否成功、失败后何时重试”。
     private final RabbitMqOutboxRepository outboxRepository;
     // 下面这些计数器只是 demo 状态展示，帮助你把接口调用和 RabbitMQ 控制台变化对应起来。
@@ -51,13 +55,17 @@ public class RabbitMqDemoService {
     private final AtomicLong consumed = new AtomicLong();
     private final AtomicLong duplicated = new AtomicLong();
     private final AtomicLong rejectedToDeadLetter = new AtomicLong();
+    private final AtomicLong deadLetterResolved = new AtomicLong();
     // 幂等演示：用 messageId 记录已处理消息。生产环境通常换成数据库唯一索引或 Redis SETNX。
     private final Set<String> processedMessageIds = ConcurrentHashMap.newKeySet();
     // ArrayList 不是线程安全的，读写时在 record/status 里用 synchronized 保护。
     private final List<RabbitMqConsumedEvent> recentEvents = new ArrayList<>();
 
-    public RabbitMqDemoService(RabbitTemplate rabbitTemplate, RabbitMqOutboxRepository outboxRepository) {
+    public RabbitMqDemoService(RabbitTemplate rabbitTemplate,
+                               ObjectMapper objectMapper,
+                               RabbitMqOutboxRepository outboxRepository) {
         this.rabbitTemplate = rabbitTemplate;
+        this.objectMapper = objectMapper;
         this.outboxRepository = outboxRepository;
         // mandatory=true 且消息到达 exchange 但没有匹配队列时，会触发 returns callback。
         // 这能演示“消息到了交换机，却没有进任何队列”的不可路由问题。
@@ -138,10 +146,70 @@ public class RabbitMqDemoService {
                 consumed.get(),
                 duplicated.get(),
                 rejectedToDeadLetter.get(),
+                deadLetterResolved.get(),
                 outboxRepository.countByStatus(),
                 outboxRepository.recent(MAX_RECENT_OUTBOX_MESSAGES),
                 ids,
                 events);
+    }
+
+    public RabbitMqDlqResolveResult resolveNextDeadLetter(String compensationNote) {
+        // RabbitMQ 的 queue 不是数据库表，不能按 id 随机删除某一行。
+        // 生产里通常用“DLQ 修复/补偿工具”顺序取消息：先排障或补偿，成功后 ACK；失败则不要 ACK。
+        return rabbitTemplate.execute(channel -> {
+            // autoAck=false 是关键：取出 DLQ 消息后先保持 unacked，直到补偿成功才 basicAck 删除。
+            GetResponse response = channel.basicGet(RabbitMqDemoConfig.BOOKING_DLQ, false);
+            if (response == null) {
+                return new RabbitMqDlqResolveResult(
+                        false,
+                        RabbitMqDemoConfig.BOOKING_DLQ,
+                        null,
+                        null,
+                        null,
+                        "no-message",
+                        normalizeCompensationNote(compensationNote),
+                        "DLQ has no ready message to resolve",
+                        Instant.now());
+            }
+
+            long deliveryTag = response.getEnvelope().getDeliveryTag();
+            try {
+                RabbitMqBookingMessage payload = objectMapper.readValue(response.getBody(), RabbitMqBookingMessage.class);
+                String messageId = response.getProps().getMessageId();
+                if (messageId == null || messageId.isBlank()) {
+                    messageId = payload.messageId();
+                }
+                String note = normalizeCompensationNote(compensationNote);
+
+                // 这里用 processedMessageIds 模拟“补偿动作已经落库”的幂等记录。
+                // 真实生产系统应写补偿流水表、订单状态表或人工工单表，并用唯一键防止重复补偿。
+                boolean firstCompensation = processedMessageIds.add(messageId);
+                String compensationDetail = firstCompensation
+                        ? "manual compensation finished, then ACK DLQ message"
+                        : "messageId already compensated before, ACK duplicate DLQ message without side effects";
+
+                // 对 DLQ 消息执行 basicAck 后，RabbitMQ 会把这条消息从 hotel.booking.created.dlq 删除。
+                // 如果补偿失败，应该 basicNack(requeue=true) 或转存到 parking-lot 队列，不能 ACK 掉。
+                channel.basicAck(deliveryTag, false);
+                deadLetterResolved.incrementAndGet();
+                record(messageId, payload.orderId(), "dlq-resolved", compensationDetail + "; note=" + note);
+
+                return new RabbitMqDlqResolveResult(
+                        true,
+                        RabbitMqDemoConfig.BOOKING_DLQ,
+                        messageId,
+                        payload.orderId(),
+                        firstDeathReason(response.getProps().getHeaders()),
+                        "basicAck-delete",
+                        note,
+                        "compensation succeeded before ACK, so RabbitMQ removes the message from the DLQ",
+                        Instant.now());
+            } catch (Exception ex) {
+                // 只要补偿或反序列化过程失败，就不要 ACK；这里 requeue=true 让消息回到 DLQ，方便继续排查。
+                channel.basicNack(deliveryTag, false, true);
+                throw new IllegalStateException("Failed to resolve DLQ message, message has been requeued", ex);
+            }
+        });
     }
 
     @Scheduled(fixedDelay = 5_000)
@@ -290,6 +358,23 @@ public class RabbitMqDemoService {
             return "MSG-" + UUID.randomUUID().toString().substring(0, 8);
         }
         return messageId;
+    }
+
+    private String normalizeCompensationNote(String compensationNote) {
+        if (compensationNote == null || compensationNote.isBlank()) {
+            return "manual troubleshooting or compensation has been completed";
+        }
+        return compensationNote;
+    }
+
+    private String firstDeathReason(Map<String, Object> headers) {
+        // RabbitMQ 会在死信消息 header 里写入 x-first-death-reason/x-death，帮助定位死信来源。
+        // 本 demo 只取最容易读懂的首次死信原因给接口返回。
+        if (headers == null) {
+            return null;
+        }
+        Object reason = headers.get("x-first-death-reason");
+        return reason == null ? null : reason.toString();
     }
 
     private void record(String messageId, String orderId, String status, String detail) {

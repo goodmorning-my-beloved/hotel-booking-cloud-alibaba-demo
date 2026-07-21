@@ -40,6 +40,13 @@ public class MessageController {
         return ApiResponse.ok(rabbitMqDemoService.publishDeadLetter(messageId));
     }
 
+    @PostMapping("/rabbitmq/demo/dead-letter/resolve-next")
+    public ApiResponse<RabbitMqDlqResolveResult> resolveNextDeadLetter(
+            @RequestParam(value = "compensationNote", required = false) String compensationNote) {
+        // DLQ 补偿演示：从死信队列取下一条消息，模拟人工排障/补偿完成后 basicAck 删除。
+        return ApiResponse.ok(rabbitMqDemoService.resolveNextDeadLetter(compensationNote));
+    }
+
     @PostMapping("/rabbitmq/demo/unroutable")
     public ApiResponse<RabbitMqDemoPublishResult> publishUnroutable(
             @RequestParam(value = "messageId", required = false) String messageId) {

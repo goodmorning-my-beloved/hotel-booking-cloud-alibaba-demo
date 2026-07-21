@@ -140,7 +140,7 @@ EOF
       cat <<'EOF'
 
 RabbitMQ lab is up.
-Learn: exchange, queue, routing key, publisher confirm, manual ack, idempotency, DLQ.
+Learn: exchange, queue, routing key, publisher confirm, manual ack, idempotency, DLQ, DLQ compensation ACK.
 
 Open:
   RabbitMQ: http://127.0.0.1:15672  guest/guest
@@ -150,6 +150,7 @@ Verify:
   curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/normal
   curl -s -XPOST 'http://127.0.0.1:8080/api/messages/rabbitmq/demo/duplicate?messageId=MSG-DEMO-1'
   curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/dead-letter
+  curl -s -XPOST 'http://127.0.0.1:8080/api/messages/rabbitmq/demo/dead-letter/resolve-next?compensationNote=order%20status%20fixed%20manually'
   curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/unroutable
   curl -s http://127.0.0.1:8080/api/messages/rabbitmq/demo/status
 

@@ -4,6 +4,8 @@
 
 保留原有酒店业务代码，方便以后回看 Gateway、Nacos、RabbitMQ、Kafka、Sentinel、Seata 在完整链路里的组合方式。但日常学习请优先使用下面的新入口。
 
+代码已经按 DDD 分层目录组织。新增接口、领域规则、Feign/MQ/DB 实现时，先看 [docs/ddd-development-guide.md](docs/ddd-development-guide.md)。
+
 ## 新入口
 
 ```bash
@@ -109,6 +111,9 @@ curl -s http://127.0.0.1:8080/actuator/gateway/routes
 学习重点：
 
 - exchange 负责按 routing key 分发消息，queue 是消息暂存地。
+- direct exchange 按 routing key 精确匹配，适合明确的一类业务事件。
+- topic exchange 支持通配符：`*` 匹配一个单词，`#` 匹配零个或多个单词，适合按事件层级订阅。
+- fanout exchange 忽略 routing key，把同一条消息广播复制到所有绑定队列，适合一发多下游通知。
 - 生产端先写本地消息表 `mq_outbox_message`，再异步发送 RabbitMQ，避免“业务成功但消息没有记录”。
 - publisher confirm 使用异步回调更新本地消息表：Broker ack 后标记 `SENT`，nack 或超时后进入 `RETRYING`。
 - 定时重试任务会扫描 `RETRYING` 和 confirm 超时的消息，按 `attempt_count` 做有限次数补偿。
@@ -136,23 +141,32 @@ curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/dead-letter
 curl -s 'http://127.0.0.1:8080/api/messages/dlq/incidents?status=PENDING'
 curl -s -XPOST 'http://127.0.0.1:8080/api/messages/dlq/incidents/INC-替换为上一步返回的incidentId/resolve?compensationNote=order%20status%20fixed%20manually'
 curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/unroutable
+curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/topic
+curl -s -XPOST 'http://127.0.0.1:8080/api/messages/rabbitmq/demo/topic?routingKey=hotel.booking.payment.timeout'
+curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/fanout
 curl -s http://127.0.0.1:8080/api/messages/rabbitmq/demo/status
 ```
 
 控制台观察：
 
-- `Exchanges` 里看 `hotel.booking.exchange` 和 `hotel.booking.dlx`。
+- `Exchanges` 里看 `hotel.booking.exchange`、`hotel.booking.dlx`、`hotel.booking.topic.exchange`、`hotel.booking.fanout.exchange`。
 - `Queues and Streams` 里看 `hotel.booking.created.queue` 和 `hotel.booking.created.dlq`。
+- topic 通配队列看 `hotel.booking.topic.single-word.queue` 和 `hotel.booking.topic.multi-word.queue`。
+- fanout 广播队列看 `hotel.booking.fanout.sms.queue` 和 `hotel.booking.fanout.points.queue`。
 - 触发 `/normal` 后，接口会先返回本地消息表的 `outboxId`，随后 `/status` 里的 `recentOutboxMessages` 会从 `WAIT_CONFIRM` 变成 `SENT`。
 - 触发 `/dead-letter` 后，正常消费者会把消息 nack 到 DLQ，DLQ Listener 随后把它写成 `PENDING` 事故任务。
 - 查询 `/dlq/incidents?status=PENDING` 可以拿到待补偿的 `incidentId`。
 - 触发 `/dlq/incidents/{incidentId}/resolve` 后，服务模拟人工补偿成功并把这条任务标记为 `RESOLVED`。
 - 触发 `/duplicate?messageId=MSG-DEMO-1` 后，接口状态里的 `duplicated` 会增加，但业务只处理一次。
 - 触发 `/unroutable` 后，接口状态里的 `returned` 会增加，本地消息表对应记录会变成 `RETURNED`。
+- 触发 `/topic` 默认 routing key 是 `hotel.booking.created`，会同时命中 `hotel.booking.*` 和 `hotel.booking.#` 两个队列。
+- 触发 `/topic?routingKey=hotel.booking.payment.timeout` 时，只有 `hotel.booking.#` 队列会收到，因为 `*` 只能匹配一个单词。
+- 触发 `/fanout` 后，短信队列和积分队列都会收到同一条消息，说明 fanout 是广播复制，不是多个消费者抢一条。
 
 面试表达可以这样串起来：
 
 ```text
+direct exchange 精确匹配 routing key；topic exchange 让消费者用 * 和 # 做事件模式订阅；fanout exchange 忽略 routing key，给每个绑定队列复制一份消息。
 生产端可靠投递 = 本地消息表先落库 + 异步 publisher confirm 回写状态 + 定时任务补偿重试。
 confirm 只证明 Broker 收到了消息；mandatory return 证明是否成功路由到队列。
 重试可能带来重复投递，所以消费者必须用 messageId 做幂等，并在业务成功后手动 ACK。
@@ -213,7 +227,7 @@ docker exec hotel-demo-kafka /opt/kafka/bin/kafka-console-consumer.sh \
 学习重点：
 
 - `user-service` 暴露了一个最小限流资源：`userSentinelLab`。
-- 代码在 [user-service/src/main/java/com/example/hotel/user/UserController.java](user-service/src/main/java/com/example/hotel/user/UserController.java)。
+- 代码在 [user-service/src/main/java/com/example/hotel/user/interfaces/rest/UserController.java](user-service/src/main/java/com/example/hotel/user/interfaces/rest/UserController.java)。
 - Dashboard 里可以给资源加 QPS 规则，触发 `blockHandler`。
 
 控制台：

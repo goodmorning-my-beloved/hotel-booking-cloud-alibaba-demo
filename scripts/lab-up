@@ -140,7 +140,7 @@ EOF
       cat <<'EOF'
 
 RabbitMQ lab is up.
-Learn: exchange, queue, routing key, publisher confirm, manual ack, idempotency, DLQ incident task, manual compensation resolve.
+Learn: direct/topic/fanout exchange, queue, routing key, publisher confirm, manual ack, idempotency, DLQ incident task, manual compensation resolve.
 
 Open:
   RabbitMQ: http://127.0.0.1:15672  guest/guest
@@ -153,13 +153,22 @@ Verify:
   curl -s 'http://127.0.0.1:8080/api/messages/dlq/incidents?status=PENDING'
   curl -s -XPOST 'http://127.0.0.1:8080/api/messages/dlq/incidents/<incidentId>/resolve?compensationNote=order%20status%20fixed%20manually'
   curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/unroutable
+  curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/topic
+  curl -s -XPOST 'http://127.0.0.1:8080/api/messages/rabbitmq/demo/topic?routingKey=hotel.booking.payment.timeout'
+  curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/fanout
   curl -s http://127.0.0.1:8080/api/messages/rabbitmq/demo/status
 
 RabbitMQ Console:
   Queues and Streams -> hotel.booking.created.queue
   Queues and Streams -> hotel.booking.created.dlq
+  Queues and Streams -> hotel.booking.topic.single-word.queue
+  Queues and Streams -> hotel.booking.topic.multi-word.queue
+  Queues and Streams -> hotel.booking.fanout.sms.queue
+  Queues and Streams -> hotel.booking.fanout.points.queue
   Exchanges -> hotel.booking.exchange
   Exchanges -> hotel.booking.dlx
+  Exchanges -> hotel.booking.topic.exchange
+  Exchanges -> hotel.booking.fanout.exchange
 
 Stop:
   ./scripts/lab-down

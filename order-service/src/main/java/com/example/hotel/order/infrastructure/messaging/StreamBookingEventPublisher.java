@@ -1,8 +1,8 @@
 package com.example.hotel.order.infrastructure.messaging;
 
-import com.example.hotel.common.dto.BookingCreatedEvent;
 import com.example.hotel.order.application.port.out.BookingEventPublisher;
 import com.example.hotel.order.domain.event.BookingCreated;
+import com.example.hotel.order.infrastructure.messaging.dto.BookingCreatedMessage;
 import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +17,7 @@ public class StreamBookingEventPublisher implements BookingEventPublisher {
 
     @Override
     public void publish(BookingCreated event) {
-        BookingCreatedEvent integrationEvent = new BookingCreatedEvent(
+        BookingCreatedMessage integrationEvent = new BookingCreatedMessage(
                 event.orderId(), event.userId(), event.roomId(), event.amount(), event.occurredAt());
         boolean rabbitSent = streamBridge.send("bookingCreatedRabbit-out-0", integrationEvent);
         boolean kafkaSent = streamBridge.send("bookingCreatedKafka-out-0", integrationEvent);

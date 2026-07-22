@@ -3,8 +3,8 @@ package com.example.hotel.user.interfaces.rest;
 import com.alibaba.csp.sentinel.annotation.SentinelResource;
 import com.alibaba.csp.sentinel.slots.block.BlockException;
 import com.example.hotel.common.api.ApiResponse;
-import com.example.hotel.common.dto.UserDto;
 import com.example.hotel.user.application.port.in.UserQueryUseCase;
+import com.example.hotel.user.interfaces.rest.dto.UserResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,9 +21,9 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<UserDto> findById(@PathVariable("id") Long id) {
+    public ApiResponse<UserResponse> findById(@PathVariable("id") Long id) {
         return userQueryUseCase.getUser(id)
-                .map(user -> ApiResponse.ok(new UserDto(user.id(), user.name(), user.membershipLevel())))
+                .map(user -> ApiResponse.ok(new UserResponse(user.id(), user.name(), user.membershipLevel())))
                 .orElseGet(() -> ApiResponse.fail("User not found: " + id));
     }
 

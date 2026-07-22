@@ -1,7 +1,7 @@
 package com.example.hotel.order.infrastructure.client;
 
-import com.example.hotel.common.dto.UserDto;
 import com.example.hotel.order.application.port.out.UserProfileGateway;
+import com.example.hotel.order.infrastructure.client.dto.UserApiResponse;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -15,7 +15,7 @@ public class FeignUserProfileGateway implements UserProfileGateway {
 
     @Override
     public UserProfile getRequiredUser(Long userId) {
-        UserDto user = RemoteResponse.requireData(userClient.findById(userId), "User check failed");
+        UserApiResponse user = RemoteResponse.requireData(userClient.findById(userId), "User check failed");
         return new UserProfile(user.id(), user.name(), user.level());
     }
 }

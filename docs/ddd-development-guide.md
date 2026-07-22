@@ -172,9 +172,19 @@ RoomInventoryGateway
 PaymentGateway
 ```
 
-Feign Adapter 负责把远端 `UserDto`、`RoomDto`、`PaymentResponse` 翻译成本地需要的 `UserProfile`、`RoomOffer`、`PaymentReceipt`。这层翻译就是简化的防腐层。
+服务提供方在自己的 `interfaces/rest/dto` 中定义对外 HTTP 协议；调用方在自己的 `infrastructure/client/dto` 中定义它所理解的远端协议。例如订单上下文使用 `UserApiResponse`、`RoomApiResponse`、`PaymentApiResponse`，再由 Feign Adapter 翻译成本地的 `UserProfile`、`RoomOffer`、`PaymentReceipt`。这层翻译就是简化的防腐层。
 
-`hotel-common` 目前只作为演示项目的发布协议模块。不要把其中的 DTO 引入 `domain`，也不要在共享模块中增加订单、库存或支付行为；否则多个上下文会重新耦合成一个共享领域模型。
+```text
+payment-service/interfaces/rest/dto/PayOrderRequest
+    支付上下文拥有的入站协议
+
+order-service/infrastructure/client/dto/PaymentApiRequest
+    订单上下文拥有的出站协议
+```
+
+两者 JSON 字段可以相同，但不是同一个 Java 类型。少量结构重复用于换取上下文自治；兼容性应由 HTTP 集成测试、OpenAPI 或消费者契约测试保证，而不是依赖一个共享 Java DTO 恰好能编译。
+
+`hotel-common` 现在只保留无业务语义的 `ApiResponse` Web 包装，不再提供共享 DTO。订单、用户、酒店、支付的 REST DTO 都归各自接口适配器所有；订单向 RabbitMQ/Kafka 发布的 `BookingCreatedMessage` 也归消息出站适配器所有。将来如果多个消费者确实需要稳定的发布语言，可以按提供方拆出 `payment-api-contract` 或 `booking-event-contract`，不要重新建立一个包含所有上下文对象的大 `common` 模块。
 
 ## 五、事务与补偿
 

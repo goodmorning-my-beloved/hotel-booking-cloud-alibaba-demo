@@ -1,5 +1,7 @@
 package com.example.hotel.message.infrastructure.persistence;
 
+import com.example.hotel.message.application.port.out.RabbitMqDlqIncidentStore;
+
 import com.example.hotel.message.domain.model.RabbitMqDlqIncident;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -15,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 @Repository
-public class RabbitMqDlqIncidentRepository {
+public class RabbitMqDlqIncidentRepository implements RabbitMqDlqIncidentStore {
 
     public static final String STATUS_PENDING = "PENDING";
     public static final String STATUS_RESOLVING = "RESOLVING";

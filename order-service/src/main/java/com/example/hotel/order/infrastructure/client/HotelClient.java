@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @FeignClient(name = "hotel-service")
 public interface HotelClient {
@@ -19,5 +20,6 @@ public interface HotelClient {
     ApiResponse<RoomDto> reserve(@PathVariable("roomId") Long roomId, @RequestBody ReserveRoomRequest request);
 
     @PostMapping("/rooms/{roomId}/release")
-    ApiResponse<RoomDto> release(@PathVariable("roomId") Long roomId);
+    ApiResponse<RoomDto> release(@PathVariable("roomId") Long roomId,
+                                 @RequestParam("orderId") String orderId);
 }

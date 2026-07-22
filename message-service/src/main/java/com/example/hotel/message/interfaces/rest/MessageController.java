@@ -1,11 +1,11 @@
 package com.example.hotel.message.interfaces.rest;
 
 import com.example.hotel.common.api.ApiResponse;
-import com.example.hotel.message.application.service.RabbitMqDemoService;
+import com.example.hotel.message.application.service.RabbitMqDemoApplicationService;
+import com.example.hotel.message.application.result.RabbitMqDemoPublishResult;
+import com.example.hotel.message.application.result.RabbitMqDemoStatus;
+import com.example.hotel.message.application.result.RabbitMqDlqResolveResult;
 import com.example.hotel.message.domain.model.RabbitMqDlqIncident;
-import com.example.hotel.message.interfaces.rest.dto.RabbitMqDemoPublishResult;
-import com.example.hotel.message.interfaces.rest.dto.RabbitMqDemoStatus;
-import com.example.hotel.message.interfaces.rest.dto.RabbitMqDlqResolveResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,9 +19,9 @@ import java.util.List;
 @RequestMapping("/messages")
 public class MessageController {
 
-    private final RabbitMqDemoService rabbitMqDemoService;
+    private final RabbitMqDemoApplicationService rabbitMqDemoService;
 
-    public MessageController(RabbitMqDemoService rabbitMqDemoService) {
+    public MessageController(RabbitMqDemoApplicationService rabbitMqDemoService) {
         this.rabbitMqDemoService = rabbitMqDemoService;
     }
 

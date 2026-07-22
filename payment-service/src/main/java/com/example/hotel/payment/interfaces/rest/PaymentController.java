@@ -5,29 +5,43 @@ import com.alibaba.csp.sentinel.slots.block.BlockException;
 import com.example.hotel.common.api.ApiResponse;
 import com.example.hotel.common.dto.PaymentRequest;
 import com.example.hotel.common.dto.PaymentResponse;
+import com.example.hotel.payment.application.command.PayOrderCommand;
+import com.example.hotel.payment.application.port.in.PaymentUseCase;
+import com.example.hotel.payment.application.result.PaymentView;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.math.BigDecimal;
-import java.util.UUID;
-
 @RestController
 @RequestMapping("/payments")
 public class PaymentController {
 
+    private final PaymentUseCase paymentUseCase;
+
+    public PaymentController(PaymentUseCase paymentUseCase) {
+        this.paymentUseCase = paymentUseCase;
+    }
+
     @PostMapping("/pay")
     @SentinelResource(value = "payOrder", blockHandler = "payBlocked")
     public ApiResponse<PaymentResponse> pay(@RequestBody PaymentRequest request) {
-        if (request.amount().compareTo(new BigDecimal("1500.00")) > 0) {
-            return ApiResponse.fail("Payment risk control rejected amount: " + request.amount());
-        }
-        String paymentId = "PAY-" + UUID.randomUUID().toString().substring(0, 8);
-        return ApiResponse.ok(new PaymentResponse(paymentId, "PAID"));
+        PaymentView payment = paymentUseCase.pay(
+                new PayOrderCommand(request.orderId(), request.userId(), request.amount()));
+        return ApiResponse.ok(toResponse(payment));
+    }
+
+    @PostMapping("/{orderId}/refund")
+    public ApiResponse<PaymentResponse> refund(@PathVariable("orderId") String orderId) {
+        return ApiResponse.ok(toResponse(paymentUseCase.refund(orderId)));
     }
 
     public ApiResponse<PaymentResponse> payBlocked(PaymentRequest request, BlockException ex) {
         return ApiResponse.fail("Sentinel blocked payOrder, please retry later.");
+    }
+
+    private PaymentResponse toResponse(PaymentView payment) {
+        return new PaymentResponse(payment.paymentId(), payment.status());
     }
 }

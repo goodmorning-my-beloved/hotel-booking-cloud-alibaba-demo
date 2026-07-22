@@ -4,7 +4,7 @@
 
 保留原有酒店业务代码，方便以后回看 Gateway、Nacos、RabbitMQ、Kafka、Sentinel、Seata 在完整链路里的组合方式。但日常学习请优先使用下面的新入口。
 
-代码已经按 DDD 分层目录组织。新增接口、领域规则、Feign/MQ/DB 实现时，先看 [docs/ddd-development-guide.md](docs/ddd-development-guide.md)。
+酒店主链路已按轻量 DDD + 端口适配器结构组织，并带有领域、用例和架构测试。新增接口、领域规则、Feign/MQ/DB 实现时，先看 [docs/ddd-development-guide.md](docs/ddd-development-guide.md)。
 
 ## 新入口
 

@@ -1,5 +1,7 @@
 package com.example.hotel.message.infrastructure.persistence;
 
+import com.example.hotel.message.application.port.out.RabbitMqOutboxStore;
+
 import com.example.hotel.message.domain.model.RabbitMqBookingMessage;
 import com.example.hotel.message.domain.model.RabbitMqOutboxMessage;
 import com.example.hotel.message.domain.model.RabbitMqOutboxPublishTask;
@@ -18,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 @Repository
-public class RabbitMqOutboxRepository {
+public class RabbitMqOutboxRepository implements RabbitMqOutboxStore {
 
     public static final String STATUS_PENDING = "PENDING";
     public static final String STATUS_WAIT_CONFIRM = "WAIT_CONFIRM";

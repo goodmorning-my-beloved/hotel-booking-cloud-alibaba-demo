@@ -4,7 +4,7 @@
 
 保留原有酒店业务代码，方便以后回看 Gateway、Nacos、RabbitMQ、Kafka、Sentinel、Seata 在完整链路里的组合方式。但日常学习请优先使用下面的新入口。
 
-酒店主链路已按轻量 DDD + 端口适配器结构组织，并带有领域、用例和架构测试。新增接口、领域规则、Feign/MQ/DB 实现时，先看 [docs/ddd-development-guide.md](docs/ddd-development-guide.md)。
+酒店主链路已按轻量 DDD + 端口适配器结构组织，并带有领域、用例和架构测试。新增接口、领域规则、Feign/MQ/DB 实现时，先看 [docs/ddd-development-guide.md](docs/ddd-development-guide.md)。学习 Kafka 时看 [docs/kafka-quick-start-guide.md](docs/kafka-quick-start-guide.md)。
 
 ## 新入口
 
@@ -31,8 +31,8 @@ cd /opt/codex-runner/workspace/hotel-booking-sca-demo
 | --- | --- | --- | --- |
 | `nacos` | Nacos + user-service + gateway-service | 服务注册、服务发现、provider/consumer | 中 |
 | `gateway` | Nacos + gateway-service + user-service | 路由、`StripPrefix`、`lb://` 负载均衡路由 | 中 |
-| `rabbitmq` | RabbitMQ | queue、exchange、routing key、发布与消费 | 低 |
-| `kafka` | Kafka | topic、producer、consumer、offset | 中偏高 |
+| `rabbitmq` | Nacos + RabbitMQ + gateway-service + message-service | queue、exchange、routing key、发布与消费 | 中 |
+| `kafka` | Nacos + RabbitMQ + Kafka + gateway-service + message-service | topic、partition、producer ACK、consumer group、offset、lag、DLT | 中偏高 |
 | `sentinel` | Nacos + Sentinel Dashboard + user-service | 资源名、限流规则、blockHandler | 中 |
 | `sentinel-chain` | Nacos + Sentinel Dashboard + Prometheus + Grafana + Gateway + BFF + A + B | Sentinel 集群流控、Prometheus 指标采集、Grafana JVM/线程面板 | 中偏高 |
 | `seata` | Nacos + Seata Server + hotel-service + payment-service | Seata 控制台、客户端配置、事务组映射 | 中偏高 |
@@ -190,25 +190,39 @@ DLQ 是失败现场，不是工单系统；DLQ Listener 先把死信落成 PENDI
 
 学习重点：
 
-- topic 是消息分类。
-- producer 写入 topic。
-- consumer 从 topic 读取消息。
-- offset 表示消费进度。
+- topic 是消息分类，partition 是 topic 内的并行日志。
+- producer 写入 topic，Broker ACK 后返回 partition 和 offset。
+- key 决定 partition，同一 key 在同一 partition 内有序。
+- consumer group 内负载均衡，group 间各自消费一份。
+- offset 表示消费进度，lag 表示消费积压。
+- 重复消费要靠业务幂等，失败消息应有限重试后进 DLT。
 
-这个 lab 不启动 Kafka UI，减少内存占用。
+这个 lab 不启动 Kafka UI、订单、支付、Seata、Sentinel 和前端构建，减少内存占用。RabbitMQ 只是为了满足 `message-service` 当前已有 RabbitMQ demo bean 的运行前提。
 
 验证：
 
 ```bash
-docker exec hotel-demo-kafka /opt/kafka/bin/kafka-topics.sh \
-  --bootstrap-server localhost:9092 --create --if-not-exists --topic lab.events
-
-printf 'hello kafka lab\n' | docker exec -i hotel-demo-kafka /opt/kafka/bin/kafka-console-producer.sh \
-  --bootstrap-server localhost:9092 --topic lab.events
-
-docker exec hotel-demo-kafka /opt/kafka/bin/kafka-console-consumer.sh \
-  --bootstrap-server localhost:9092 --topic lab.events --from-beginning --max-messages 1 --timeout-ms 5000
+curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/normal?key=room-101'
+curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/key-order?key=room-101&count=5'
+curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/group?count=9'
+curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/duplicate?messageId=KMSG-DEMO-DUP'
+curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/dead-letter?key=room-102'
+sleep 3
+curl -s http://127.0.0.1:8080/api/messages/kafka/demo/status
 ```
+
+CLI 观察：
+
+```bash
+docker exec hotel-demo-kafka /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 --describe --topic hotel.kafka.demo.orders
+docker exec hotel-demo-kafka /opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server localhost:9092 --topic hotel.kafka.demo.orders --from-beginning --max-messages 1 --timeout-ms 5000
+docker exec hotel-demo-kafka /opt/kafka/bin/kafka-consumer-groups.sh \
+  --bootstrap-server localhost:9092 --describe --group hotel-kafka-demo-primary
+```
+
+快速手册：[docs/kafka-quick-start-guide.md](docs/kafka-quick-start-guide.md)。
 
 停止：
 

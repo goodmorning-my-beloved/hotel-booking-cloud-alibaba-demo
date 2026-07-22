@@ -53,6 +53,9 @@ spring:
       kafka:
         binder:
           brokers: ${KAFKA_BOOTSTRAP_SERVERS:127.0.0.1:9092}
+  kafka:
+    # Spring Kafka 原生客户端地址；Docker profile 启动时由 KAFKA_BOOTSTRAP_SERVERS=kafka:9092 指向容器名。
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:127.0.0.1:9092}
   rabbitmq:
     # RabbitMQ Broker 地址；Docker profile 启动时由 RABBITMQ_HOST=rabbitmq 指向容器名。
     host: ${RABBITMQ_HOST:127.0.0.1}

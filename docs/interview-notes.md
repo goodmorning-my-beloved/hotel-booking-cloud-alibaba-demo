@@ -82,12 +82,16 @@ Feign 的核心价值是把 HTTP 调用写成 Java 接口，并结合服务发�
 
 同一笔订单创建后也会发送到 Kafka topic `hotel-booking-created`，`message-service` 使用消费者组 `message-service` 消费。
 
+另外 Kafka Lab 在 `message-service` 里提供了一套独立接口，topic 是 `hotel.kafka.demo.orders`，DLT 是 `hotel.kafka.demo.orders.DLT`。快速手册见 [kafka-quick-start-guide.md](kafka-quick-start-guide.md)。
+
 常见追问：
 
 - topic、partition、consumer group、offset 分别是什么？
 - Kafka 为什么吞吐高？
 - 如何保证分区内有序？
 - 消费位移提交失败或重复消费怎么处理？
+- 如何观察 consumer lag？
+- 失败重试和 DLT 怎么设计？
 
 ## 推荐回答思路
 

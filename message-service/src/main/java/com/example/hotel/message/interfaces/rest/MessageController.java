@@ -2,6 +2,9 @@ package com.example.hotel.message.interfaces.rest;
 
 import com.example.hotel.common.api.ApiResponse;
 import com.example.hotel.message.application.service.BookingEventApplicationService;
+import com.example.hotel.message.application.service.KafkaDemoApplicationService;
+import com.example.hotel.message.application.result.KafkaDemoPublishResult;
+import com.example.hotel.message.application.result.KafkaDemoStatus;
 import com.example.hotel.message.application.service.RabbitMqDemoApplicationService;
 import com.example.hotel.message.application.result.RabbitMqDemoPublishResult;
 import com.example.hotel.message.application.result.RabbitMqDemoStatus;
@@ -23,11 +26,14 @@ public class MessageController {
 
     private final RabbitMqDemoApplicationService rabbitMqDemoService;
     private final BookingEventApplicationService bookingEventService;
+    private final KafkaDemoApplicationService kafkaDemoService;
 
     public MessageController(RabbitMqDemoApplicationService rabbitMqDemoService,
-                             BookingEventApplicationService bookingEventService) {
+                             BookingEventApplicationService bookingEventService,
+                             KafkaDemoApplicationService kafkaDemoService) {
         this.rabbitMqDemoService = rabbitMqDemoService;
         this.bookingEventService = bookingEventService;
+        this.kafkaDemoService = kafkaDemoService;
     }
 
     @GetMapping("/booking-events")
@@ -112,5 +118,49 @@ public class MessageController {
     public ApiResponse<RabbitMqDemoStatus> rabbitMqDemoStatus() {
         // 状态接口用于把发布、确认、退回、消费、重复、死信计数串起来观察。
         return ApiResponse.ok(rabbitMqDemoService.status());
+    }
+
+    @PostMapping("/kafka/demo/normal")
+    public ApiResponse<KafkaDemoPublishResult> publishKafkaNormal(
+            @RequestParam(value = "messageId", required = false) String messageId,
+            @RequestParam(value = "key", required = false) String key) {
+        // 普通生产演示：key 决定 partition，Broker ACK 后返回 topic/partition/offset。
+        return ApiResponse.ok(kafkaDemoService.publishNormal(messageId, key));
+    }
+
+    @PostMapping("/kafka/demo/key-order")
+    public ApiResponse<List<KafkaDemoPublishResult>> publishKafkaKeyOrder(
+            @RequestParam(value = "key", required = false) String key,
+            @RequestParam(value = "count", defaultValue = "5") int count) {
+        // 同 key 有序演示：同一个 key 进入同一个 partition，在该 partition 内按 offset 有序。
+        return ApiResponse.ok(kafkaDemoService.publishKeyOrder(key, count));
+    }
+
+    @PostMapping("/kafka/demo/group")
+    public ApiResponse<List<KafkaDemoPublishResult>> publishKafkaConsumerGroupBatch(
+            @RequestParam(value = "count", defaultValue = "9") int count) {
+        // 消费者组演示：同组内多个消费者分摊 partition，不同 group 都会收到自己的消息副本。
+        return ApiResponse.ok(kafkaDemoService.publishConsumerGroupBatch(count));
+    }
+
+    @PostMapping("/kafka/demo/duplicate")
+    public ApiResponse<List<KafkaDemoPublishResult>> publishKafkaDuplicate(
+            @RequestParam(value = "messageId", required = false) String messageId) {
+        // 幂等演示：发送两条相同 messageId 的消息，消费者只执行业务一次，但 offset 都会推进。
+        return ApiResponse.ok(kafkaDemoService.publishDuplicate(messageId));
+    }
+
+    @PostMapping("/kafka/demo/dead-letter")
+    public ApiResponse<KafkaDemoPublishResult> publishKafkaDeadLetter(
+            @RequestParam(value = "messageId", required = false) String messageId,
+            @RequestParam(value = "key", required = false) String key) {
+        // 失败重试和 DLT 演示：消费者抛异常，重试耗尽后进入 hotel.kafka.demo.orders.DLT。
+        return ApiResponse.ok(kafkaDemoService.publishDeadLetter(messageId, key));
+    }
+
+    @GetMapping("/kafka/demo/status")
+    public ApiResponse<KafkaDemoStatus> kafkaDemoStatus() {
+        // 状态接口展示 topic、partition、offset、consumer group lag、重复消息和 DLT 处理结果。
+        return ApiResponse.ok(kafkaDemoService.status());
     }
 }

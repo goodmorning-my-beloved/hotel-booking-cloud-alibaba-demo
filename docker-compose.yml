@@ -17,7 +17,7 @@ services:
   nacos:
     image: nacos/nacos-server:v2.3.2
     container_name: hotel-demo-nacos
-    profiles: ["nacos", "gateway", "rabbitmq", "sentinel", "sentinel-chain", "seata", "full"]
+    profiles: ["nacos", "gateway", "rabbitmq", "kafka", "sentinel", "sentinel-chain", "seata", "full"]
     environment:
       MODE: standalone
       NACOS_AUTH_ENABLE: "false"
@@ -90,7 +90,7 @@ services:
     # management 镜像自带 RabbitMQ Broker 和 Web 控制台，适合教学演示。
     image: rabbitmq:3.13-management
     container_name: hotel-demo-rabbitmq
-    profiles: ["rabbitmq", "full"]
+    profiles: ["rabbitmq", "kafka", "full"]
     environment:
       # demo 环境用 guest/guest，生产环境不要使用默认账号密码。
       RABBITMQ_DEFAULT_USER: guest
@@ -176,7 +176,7 @@ services:
       args:
         MODULE: gateway-service
     container_name: hotel-demo-gateway
-    profiles: ["nacos", "gateway", "rabbitmq", "sentinel-chain", "full"]
+    profiles: ["nacos", "gateway", "rabbitmq", "kafka", "sentinel-chain", "full"]
     depends_on:
       - nacos
     environment:
@@ -381,7 +381,7 @@ services:
       args:
         MODULE: message-service
     container_name: hotel-demo-message
-    profiles: ["rabbitmq", "full"]
+    profiles: ["rabbitmq", "kafka", "full"]
     depends_on:
       nacos:
         condition: service_started

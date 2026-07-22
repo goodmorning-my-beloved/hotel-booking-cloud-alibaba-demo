@@ -1,11 +1,13 @@
 package com.example.hotel.message.interfaces.rest;
 
 import com.example.hotel.common.api.ApiResponse;
+import com.example.hotel.message.application.service.BookingEventApplicationService;
 import com.example.hotel.message.application.service.RabbitMqDemoApplicationService;
 import com.example.hotel.message.application.result.RabbitMqDemoPublishResult;
 import com.example.hotel.message.application.result.RabbitMqDemoStatus;
 import com.example.hotel.message.application.result.RabbitMqDlqResolveResult;
 import com.example.hotel.message.domain.model.RabbitMqDlqIncident;
+import com.example.hotel.message.domain.model.ReceivedBookingEvent;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,9 +22,30 @@ import java.util.List;
 public class MessageController {
 
     private final RabbitMqDemoApplicationService rabbitMqDemoService;
+    private final BookingEventApplicationService bookingEventService;
 
-    public MessageController(RabbitMqDemoApplicationService rabbitMqDemoService) {
+    public MessageController(RabbitMqDemoApplicationService rabbitMqDemoService,
+                             BookingEventApplicationService bookingEventService) {
         this.rabbitMqDemoService = rabbitMqDemoService;
+        this.bookingEventService = bookingEventService;
+    }
+
+    @GetMapping("/booking-events")
+    public ApiResponse<List<ReceivedBookingEvent>> bookingEvents() {
+        // 完整酒店下单链路观测接口：order-service 创建订单后会发布 BookingCreatedEvent。
+        return ApiResponse.ok(bookingEventService.recentEvents());
+    }
+
+    @GetMapping("/booking-events/rabbitmq")
+    public ApiResponse<List<ReceivedBookingEvent>> rabbitBookingEvents() {
+        // 只看 RabbitMQ binder 收到的订单事件，便于和 Kafka binder 对比。
+        return ApiResponse.ok(bookingEventService.recentEvents("rabbitmq"));
+    }
+
+    @GetMapping("/booking-events/kafka")
+    public ApiResponse<List<ReceivedBookingEvent>> kafkaBookingEvents() {
+        // 只看 Kafka binder 收到的订单事件，证明同一业务事件也进入了 Kafka topic。
+        return ApiResponse.ok(bookingEventService.recentEvents("kafka"));
     }
 
     @PostMapping("/rabbitmq/demo/normal")

@@ -18,6 +18,9 @@ spring:
   config:
     import: optional:nacos:${spring.application.name}.yaml
   cloud:
+    function:
+      # 完整下单链路消费 order-service 发布的业务事件；RabbitMQ demo 仍然使用 @RabbitListener。
+      definition: bookingCreatedRabbit;bookingCreatedKafka
     nacos:
       discovery:
         server-addr: ${NACOS_ADDR:127.0.0.1:8848}
@@ -30,6 +33,26 @@ spring:
       eager: true
       transport:
         dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8858}
+    stream:
+      binders:
+        rabbit:
+          type: rabbit
+        kafka:
+          type: kafka
+      bindings:
+        bookingCreatedRabbit-in-0:
+          binder: rabbit
+          destination: hotel.booking.created
+          group: message-service
+          content-type: application/json
+        bookingCreatedKafka-in-0:
+          binder: kafka
+          destination: hotel-booking-created
+          group: message-service
+          content-type: application/json
+      kafka:
+        binder:
+          brokers: ${KAFKA_BOOTSTRAP_SERVERS:127.0.0.1:9092}
   rabbitmq:
     # RabbitMQ Broker 地址；Docker profile 启动时由 RABBITMQ_HOST=rabbitmq 指向容器名。
     host: ${RABBITMQ_HOST:127.0.0.1}

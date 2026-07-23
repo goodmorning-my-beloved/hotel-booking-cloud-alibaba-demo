@@ -9,54 +9,60 @@ import java.util.Map;
 @Component
 public class ConfiguredRabbitMqTopology implements RabbitMqTopology {
 
+    private final RabbitMqDemoProperties properties;
+
+    public ConfiguredRabbitMqTopology(RabbitMqDemoProperties properties) {
+        this.properties = properties;
+    }
+
     @Override
     public String bookingExchange() {
-        return RabbitMqDemoConfig.BOOKING_EXCHANGE;
+        return properties.getBookingExchange();
     }
 
     @Override
     public String bookingRoutingKey() {
-        return RabbitMqDemoConfig.BOOKING_ROUTING_KEY;
+        return properties.getBookingRoutingKey();
     }
 
     @Override
     public String bookingQueue() {
-        return RabbitMqDemoConfig.BOOKING_QUEUE;
+        return properties.getBookingQueue();
     }
 
     @Override
     public String deadLetterExchange() {
-        return RabbitMqDemoConfig.BOOKING_DLX;
+        return properties.getDeadLetterExchange();
     }
 
     @Override
     public String deadLetterQueue() {
-        return RabbitMqDemoConfig.BOOKING_DLQ;
+        return properties.getDeadLetterQueue();
     }
 
     @Override
     public String topicExchange() {
-        return RabbitMqDemoConfig.BOOKING_TOPIC_EXCHANGE;
+        return properties.getTopicExchange();
     }
 
     @Override
     public Map<String, String> topicBindings() {
         return Map.of(
-                RabbitMqDemoConfig.BOOKING_TOPIC_SINGLE_WORD_PATTERN,
-                RabbitMqDemoConfig.BOOKING_TOPIC_SINGLE_WORD_QUEUE,
-                RabbitMqDemoConfig.BOOKING_TOPIC_MULTI_WORD_PATTERN,
-                RabbitMqDemoConfig.BOOKING_TOPIC_MULTI_WORD_QUEUE);
+                properties.getTopicSingleWordPattern(),
+                properties.getTopicSingleWordQueue(),
+                properties.getTopicMultiWordPattern(),
+                properties.getTopicMultiWordQueue());
     }
 
     @Override
     public String fanoutExchange() {
-        return RabbitMqDemoConfig.BOOKING_FANOUT_EXCHANGE;
+        return properties.getFanoutExchange();
     }
 
     @Override
     public List<String> fanoutQueues() {
         return List.of(
-                RabbitMqDemoConfig.BOOKING_FANOUT_SMS_QUEUE,
-                RabbitMqDemoConfig.BOOKING_FANOUT_POINTS_QUEUE);
+                properties.getFanoutSmsQueue(),
+                properties.getFanoutPointsQueue());
     }
 }

@@ -1,0 +1,6 @@
+feign:
+  client:
+    config:
+      message-service:
+        connectTimeout: 3000
+        readTimeout: 10000

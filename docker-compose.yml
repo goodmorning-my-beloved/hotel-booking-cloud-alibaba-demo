@@ -186,6 +186,24 @@ services:
     networks:
       - hotel-demo
 
+  mq-demo-bff-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODULE: mq-demo-bff-service
+    container_name: hotel-demo-mq-demo-bff
+    profiles: ["rabbitmq", "kafka", "full"]
+    depends_on:
+      - nacos
+      - message-service
+    environment:
+      <<: *app-env
+    ports:
+      - "8089:8089"
+    networks:
+      - hotel-demo
+
   sentinel-bff-service:
     build:
       context: .
@@ -387,6 +405,9 @@ services:
         condition: service_started
       rabbitmq:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
+        required: false
     environment:
       <<: *app-env
     ports:

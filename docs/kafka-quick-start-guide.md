@@ -4,12 +4,21 @@
 
 ## 代码位置
 
-新增 Kafka demo 严格放在 `message-service` 的 DDD 分层里：
+Kafka demo 下游能力严格放在 `message-service` 的 DDD 分层里，外部演示入口走 `mq-demo-bff-service`：
 
 ```text
+mq-demo-bff-service
+  interfaces/rest/MqDemoController.java
+    Gateway 后面的 HTTP 演示入口
+  application/service/MqDemoFacadeService.java
+    BFF 编排
+  application/port/out/MessageDemoGateway.java
+  infrastructure/client/MessageServiceClient.java
+    Feign 调用 message-service
+
 message-service
   interfaces/rest/MessageController.java
-    HTTP 演示入口
+    下游消息领域服务入口
   application/service/KafkaDemoApplicationService.java
     Kafka 学习用例编排
   application/service/KafkaDemoMetrics.java
@@ -31,7 +40,7 @@ message-service
     Spring Kafka 适配器
 ```
 
-新接口仍从 `interfaces/rest` 进入，业务编排写在 `application/service`，KafkaTemplate、AdminClient、@KafkaListener 等技术细节只能放在 `infrastructure`。
+请求链路是 `gateway-service -> mq-demo-bff-service -> message-service`。新接口仍从 `interfaces/rest` 进入，业务编排写在 `application/service`，KafkaTemplate、AdminClient、@KafkaListener 等技术细节只能放在 `infrastructure`。
 
 ## 启动
 
@@ -43,7 +52,7 @@ cd /opt/codex-runner/workspace/hotel-booking-sca-demo
 这个 lab 启动：
 
 ```text
-Nacos + RabbitMQ + Kafka + gateway-service + message-service
+Nacos + RabbitMQ + Kafka + gateway-service + mq-demo-bff-service + message-service
 ```
 
 不启动订单、支付、Seata、Sentinel、Kafka UI 和前端构建。RabbitMQ 只是为了满足 `message-service` 当前已有 RabbitMQ demo bean 的运行前提。
@@ -53,13 +62,23 @@ Nacos + RabbitMQ + Kafka + gateway-service + message-service
 所有接口都走 Gateway：
 
 ```text
-http://127.0.0.1:8080/api/messages
+http://127.0.0.1:8080/api/mq-demo
+```
+
+MQ 连接、binder、topic、consumer group、RabbitMQ exchange/queue/routing key 等配置由启动脚本发布到 Nacos：
+
+```text
+namespace: pro
+group: DEFAULT_GROUP
+dataId: message-service.yaml
+dataId: order-service.yaml
+dataId: mq-demo-bff-service.yaml
 ```
 
 ### 1. 普通生产和 Broker ACK
 
 ```bash
-curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/normal?key=room-101'
+curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/normal?key=room-101'
 ```
 
 返回里的 `topic`、`partition`、`offset` 来自 Broker ACK 后的 `RecordMetadata`。面试回答时可以说：生产者发送成功不只是本地方法返回，而是 Broker 确认后拿到消息落点。
@@ -67,7 +86,7 @@ curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/normal?key=room-10
 ### 2. key、partition 和分区内有序
 
 ```bash
-curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/key-order?key=room-101&count=5'
+curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/key-order?key=room-101&count=5'
 ```
 
 同一个 key 会被分配到同一个 partition；Kafka 只保证同一个 partition 内按 offset 有序，不保证整个 topic 全局有序。
@@ -77,7 +96,7 @@ curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/key-order?key=room
 ### 3. consumer group
 
 ```bash
-curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/group?count=9'
+curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/group?count=9'
 ```
 
 当前代码有两个 group：
@@ -92,7 +111,7 @@ hotel-kafka-demo-audit
 ### 4. 重复消息和幂等
 
 ```bash
-curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/duplicate?messageId=KMSG-DEMO-DUP'
+curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/duplicate?messageId=KMSG-DEMO-DUP'
 ```
 
 Kafka 默认语义通常按 at-least-once 理解：消费者可能重复收到消息。因此消费者不能只靠 MQ 保证业务只执行一次，要用 `messageId`、业务唯一键或去重表做幂等。
@@ -102,9 +121,9 @@ Kafka 默认语义通常按 at-least-once 理解：消费者可能重复收到�
 ### 5. 失败重试和 DLT
 
 ```bash
-curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/dead-letter?key=room-102'
+curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/dead-letter?key=room-102'
 sleep 3
-curl -s http://127.0.0.1:8080/api/messages/kafka/demo/status
+curl -s http://127.0.0.1:8080/api/mq-demo/kafka/status
 ```
 
 消费者遇到 `fail=true` 会抛异常，`DefaultErrorHandler` 先重试，重试耗尽后通过 `DeadLetterPublishingRecoverer` 写入：
@@ -118,7 +137,7 @@ hotel.kafka.demo.orders.DLT
 ### 6. 状态、offset 和 lag
 
 ```bash
-curl -s http://127.0.0.1:8080/api/messages/kafka/demo/status
+curl -s http://127.0.0.1:8080/api/mq-demo/kafka/status
 ```
 
 重点看这些字段：

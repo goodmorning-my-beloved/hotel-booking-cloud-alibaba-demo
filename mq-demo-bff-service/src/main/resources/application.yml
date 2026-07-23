@@ -1,9 +1,9 @@
 server:
-  port: 8083
+  port: 8089
 
 spring:
   application:
-    name: order-service
+    name: mq-demo-bff-service
   config:
     import: optional:nacos:${spring.application.name}.yaml
   cloud:
@@ -23,16 +23,6 @@ spring:
 feign:
   sentinel:
     enabled: true
-
-seata:
-  enabled: ${SEATA_ENABLED:true}
-  application-id: ${spring.application.name}
-  tx-service-group: hotel_tx_group
-  service:
-    vgroup-mapping:
-      hotel_tx_group: default
-    grouplist:
-      default: ${SEATA_ADDR:127.0.0.1:8091}
 
 management:
   endpoints:

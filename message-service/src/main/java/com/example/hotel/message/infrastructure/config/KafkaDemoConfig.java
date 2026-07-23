@@ -10,6 +10,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
@@ -33,32 +34,33 @@ import java.util.Map;
 
 @EnableKafka
 @Configuration
+@EnableConfigurationProperties(KafkaDemoProperties.class)
 public class KafkaDemoConfig implements KafkaDemoTopology {
-
-    public static final String DEMO_TOPIC = "hotel.kafka.demo.orders";
-    public static final String DEMO_DLT_TOPIC = "hotel.kafka.demo.orders.DLT";
-    public static final String PRIMARY_GROUP = "hotel-kafka-demo-primary";
-    public static final String AUDIT_GROUP = "hotel-kafka-demo-audit";
-    public static final String DLT_GROUP = "hotel-kafka-demo-dlt";
 
     @Value("${spring.kafka.bootstrap-servers:127.0.0.1:9092}")
     private String bootstrapServers;
 
+    private final KafkaDemoProperties properties;
+
+    public KafkaDemoConfig(KafkaDemoProperties properties) {
+        this.properties = properties;
+    }
+
     @Bean
     NewTopic kafkaDemoTopic() {
-        return TopicBuilder.name(DEMO_TOPIC)
-                .partitions(3)
-                .replicas(1)
-                .config("retention.ms", "86400000")
+        return TopicBuilder.name(properties.getTopic())
+                .partitions(properties.getPartitions())
+                .replicas(properties.getReplicas())
+                .config("retention.ms", Long.toString(properties.getRetentionMs()))
                 .build();
     }
 
     @Bean
     NewTopic kafkaDemoDeadLetterTopic() {
-        return TopicBuilder.name(DEMO_DLT_TOPIC)
-                .partitions(3)
-                .replicas(1)
-                .config("retention.ms", "604800000")
+        return TopicBuilder.name(properties.getDeadLetterTopic())
+                .partitions(properties.getPartitions())
+                .replicas(properties.getReplicas())
+                .config("retention.ms", Long.toString(properties.getDeadLetterRetentionMs()))
                 .build();
     }
 
@@ -68,10 +70,10 @@ public class KafkaDemoConfig implements KafkaDemoTopology {
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
-        props.put(ProducerConfig.ACKS_CONFIG, "all");
-        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
-        props.put(ProducerConfig.RETRIES_CONFIG, 3);
-        props.put(ProducerConfig.LINGER_MS_CONFIG, 5);
+        props.put(ProducerConfig.ACKS_CONFIG, properties.getAcks());
+        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, properties.isIdempotenceEnabled());
+        props.put(ProducerConfig.RETRIES_CONFIG, properties.getRetries());
+        props.put(ProducerConfig.LINGER_MS_CONFIG, properties.getLingerMs());
         props.put(JsonSerializer.ADD_TYPE_INFO_HEADERS, false);
         return new DefaultKafkaProducerFactory<>(props);
     }
@@ -89,8 +91,8 @@ public class KafkaDemoConfig implements KafkaDemoTopology {
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 10);
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, properties.getAutoOffsetReset());
+        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, properties.getMaxPollRecords());
         props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, KafkaDemoMessage.class.getName());
         props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.example.hotel.message.domain.model");
         props.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
@@ -105,7 +107,7 @@ public class KafkaDemoConfig implements KafkaDemoTopology {
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
         factory.setCommonErrorHandler(errorHandler);
-        factory.setConcurrency(2);
+        factory.setConcurrency(properties.getListenerConcurrency());
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
         return factory;
     }
@@ -115,8 +117,9 @@ public class KafkaDemoConfig implements KafkaDemoTopology {
             @Qualifier("kafkaDemoTemplate") KafkaTemplate<String, KafkaDemoMessage> kafkaTemplate) {
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
                 kafkaOperations(kafkaTemplate),
-                (record, exception) -> new TopicPartition(DEMO_DLT_TOPIC, record.partition()));
-        return new DefaultErrorHandler(recoverer, new FixedBackOff(500L, 2L));
+                (record, exception) -> new TopicPartition(properties.getDeadLetterTopic(), record.partition()));
+        return new DefaultErrorHandler(recoverer,
+                new FixedBackOff(properties.getRetryBackoffMs(), properties.getRetryMaxAttempts()));
     }
 
     @SuppressWarnings("unchecked")
@@ -126,36 +129,39 @@ public class KafkaDemoConfig implements KafkaDemoTopology {
 
     @Override
     public String demoTopic() {
-        return DEMO_TOPIC;
+        return properties.getTopic();
     }
 
     @Override
     public String deadLetterTopic() {
-        return DEMO_DLT_TOPIC;
+        return properties.getDeadLetterTopic();
     }
 
     @Override
     public String primaryConsumerGroup() {
-        return PRIMARY_GROUP;
+        return properties.getConsumerGroups().getPrimary();
     }
 
     @Override
     public String auditConsumerGroup() {
-        return AUDIT_GROUP;
+        return properties.getConsumerGroups().getAudit();
     }
 
     @Override
     public String deadLetterConsumerGroup() {
-        return DLT_GROUP;
+        return properties.getConsumerGroups().getDeadLetter();
     }
 
     @Override
     public List<String> demoTopics() {
-        return List.of(DEMO_TOPIC, DEMO_DLT_TOPIC);
+        return List.of(properties.getTopic(), properties.getDeadLetterTopic());
     }
 
     @Override
     public List<String> demoConsumerGroups() {
-        return List.of(PRIMARY_GROUP, AUDIT_GROUP, DLT_GROUP);
+        return List.of(
+                properties.getConsumerGroups().getPrimary(),
+                properties.getConsumerGroups().getAudit(),
+                properties.getConsumerGroups().getDeadLetter());
     }
 }

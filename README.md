@@ -31,8 +31,8 @@ cd /opt/codex-runner/workspace/hotel-booking-sca-demo
 | --- | --- | --- | --- |
 | `nacos` | Nacos + user-service + gateway-service | 服务注册、服务发现、provider/consumer | 中 |
 | `gateway` | Nacos + gateway-service + user-service | 路由、`StripPrefix`、`lb://` 负载均衡路由 | 中 |
-| `rabbitmq` | Nacos + RabbitMQ + gateway-service + message-service | queue、exchange、routing key、发布与消费 | 中 |
-| `kafka` | Nacos + RabbitMQ + Kafka + gateway-service + message-service | topic、partition、producer ACK、consumer group、offset、lag、DLT | 中偏高 |
+| `rabbitmq` | Nacos + RabbitMQ + gateway-service + mq-demo-bff-service + message-service | queue、exchange、routing key、发布与消费 | 中 |
+| `kafka` | Nacos + RabbitMQ + Kafka + gateway-service + mq-demo-bff-service + message-service | topic、partition、producer ACK、consumer group、offset、lag、DLT | 中偏高 |
 | `sentinel` | Nacos + Sentinel Dashboard + user-service | 资源名、限流规则、blockHandler | 中 |
 | `sentinel-chain` | Nacos + Sentinel Dashboard + Prometheus + Grafana + Gateway + BFF + A + B | Sentinel 集群流控、Prometheus 指标采集、Grafana JVM/线程面板 | 中偏高 |
 | `seata` | Nacos + Seata Server + hotel-service + payment-service | Seata 控制台、客户端配置、事务组映射 | 中偏高 |
@@ -135,16 +135,16 @@ guest / guest
 验证：
 
 ```bash
-curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/normal
-curl -s -XPOST 'http://127.0.0.1:8080/api/messages/rabbitmq/demo/duplicate?messageId=MSG-DEMO-1'
-curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/dead-letter
-curl -s 'http://127.0.0.1:8080/api/messages/dlq/incidents?status=PENDING'
-curl -s -XPOST 'http://127.0.0.1:8080/api/messages/dlq/incidents/INC-替换为上一步返回的incidentId/resolve?compensationNote=order%20status%20fixed%20manually'
-curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/unroutable
-curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/topic
-curl -s -XPOST 'http://127.0.0.1:8080/api/messages/rabbitmq/demo/topic?routingKey=hotel.booking.payment.timeout'
-curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/fanout
-curl -s http://127.0.0.1:8080/api/messages/rabbitmq/demo/status
+curl -s -XPOST http://127.0.0.1:8080/api/mq-demo/rabbitmq/normal
+curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/rabbitmq/duplicate?messageId=MSG-DEMO-1'
+curl -s -XPOST http://127.0.0.1:8080/api/mq-demo/rabbitmq/dead-letter
+curl -s 'http://127.0.0.1:8080/api/mq-demo/rabbitmq/dlq/incidents?status=PENDING'
+curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/rabbitmq/dlq/incidents/INC-替换为上一步返回的incidentId/resolve?compensationNote=order%20status%20fixed%20manually'
+curl -s -XPOST http://127.0.0.1:8080/api/mq-demo/rabbitmq/unroutable
+curl -s -XPOST http://127.0.0.1:8080/api/mq-demo/rabbitmq/topic
+curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/rabbitmq/topic?routingKey=hotel.booking.payment.timeout'
+curl -s -XPOST http://127.0.0.1:8080/api/mq-demo/rabbitmq/fanout
+curl -s http://127.0.0.1:8080/api/mq-demo/rabbitmq/status
 ```
 
 控制台观察：
@@ -197,18 +197,18 @@ DLQ 是失败现场，不是工单系统；DLQ Listener 先把死信落成 PENDI
 - offset 表示消费进度，lag 表示消费积压。
 - 重复消费要靠业务幂等，失败消息应有限重试后进 DLT。
 
-这个 lab 不启动 Kafka UI、订单、支付、Seata、Sentinel 和前端构建，减少内存占用。RabbitMQ 只是为了满足 `message-service` 当前已有 RabbitMQ demo bean 的运行前提。
+这个 lab 不启动 Kafka UI、订单、支付、Seata、Sentinel 和前端构建，减少内存占用。演示请求链路是 `gateway-service -> mq-demo-bff-service -> message-service`。RabbitMQ 只是为了满足 `message-service` 当前已有 RabbitMQ demo bean 的运行前提。
 
 验证：
 
 ```bash
-curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/normal?key=room-101'
-curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/key-order?key=room-101&count=5'
-curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/group?count=9'
-curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/duplicate?messageId=KMSG-DEMO-DUP'
-curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/dead-letter?key=room-102'
+curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/normal?key=room-101'
+curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/key-order?key=room-101&count=5'
+curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/group?count=9'
+curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/duplicate?messageId=KMSG-DEMO-DUP'
+curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/dead-letter?key=room-102'
 sleep 3
-curl -s http://127.0.0.1:8080/api/messages/kafka/demo/status
+curl -s http://127.0.0.1:8080/api/mq-demo/kafka/status
 ```
 
 CLI 观察：
@@ -280,7 +280,7 @@ Sentinel blocked userSentinelLab
 
 - 请求链路是 `Gateway -> sentinel-bff-service -> sentinel-a-service -> sentinel-b-service`。
 - `sentinel-token-server` 独立部署，两个 BFF 实例、A 服务、B 服务都作为 cluster client 共享各自资源的集群 QPS。
-- Nacos 使用 `pro` 命名空间，启动脚本会自动创建并把 Sentinel 规则发布到 `pro`。
+- Nacos 使用 `pro` 命名空间，启动脚本会自动创建，并把 MQ 应用配置发布到 `DEFAULT_GROUP`，把 Sentinel 规则发布到 `SENTINEL_GROUP`。
 - Gateway 使用 `spring-cloud-alibaba-sentinel-gateway`，路由资源是 `sentinel-chain-bff`。
 - BFF 和 A 服务都开启 `feign.sentinel.enabled=true`，通过 Feign 调下游。
 - 三个 Web 服务都用 `@SentinelResource` 暴露清晰资源名：`chainBffEntry`、`chainAWork`、`chainBWork`。

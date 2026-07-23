@@ -14,6 +14,7 @@
     <modules>
         <module>hotel-common</module>
         <module>gateway-service</module>
+        <module>mq-demo-bff-service</module>
         <module>sentinel-token-server</module>
         <module>sentinel-bff-service</module>
         <module>sentinel-a-service</module>

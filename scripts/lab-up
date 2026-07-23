@@ -12,8 +12,8 @@ Usage: ./scripts/lab-up <lab>
 Labs:
   nacos     Nacos + user-service provider + gateway-service consumer
   gateway   Gateway + Nacos + user-service mock backend
-  rabbitmq  RabbitMQ + message-service demo for idempotency, reliability, and DLQ
-  kafka     Kafka only, without Kafka UI
+  rabbitmq  Gateway + MQ demo BFF + message-service + RabbitMQ
+  kafka     Gateway + MQ demo BFF + message-service + Kafka, without Kafka UI
   sentinel  Sentinel Dashboard + user-service limit demo
   sentinel-chain  Gateway -> BFF -> A -> B Sentinel and Feign demo
   seata     Seata learning skeleton, downgraded for 4GB machines
@@ -145,18 +145,19 @@ Learn: direct/topic/fanout exchange, queue, routing key, publisher confirm, manu
 Open:
   RabbitMQ: http://127.0.0.1:15672  guest/guest
   Gateway:  http://127.0.0.1:8080
+  Nacos:    http://127.0.0.1:8848/nacos
 
 Verify:
-  curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/normal
-  curl -s -XPOST 'http://127.0.0.1:8080/api/messages/rabbitmq/demo/duplicate?messageId=MSG-DEMO-1'
-  curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/dead-letter
-  curl -s 'http://127.0.0.1:8080/api/messages/dlq/incidents?status=PENDING'
-  curl -s -XPOST 'http://127.0.0.1:8080/api/messages/dlq/incidents/<incidentId>/resolve?compensationNote=order%20status%20fixed%20manually'
-  curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/unroutable
-  curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/topic
-  curl -s -XPOST 'http://127.0.0.1:8080/api/messages/rabbitmq/demo/topic?routingKey=hotel.booking.payment.timeout'
-  curl -s -XPOST http://127.0.0.1:8080/api/messages/rabbitmq/demo/fanout
-  curl -s http://127.0.0.1:8080/api/messages/rabbitmq/demo/status
+  curl -s -XPOST http://127.0.0.1:8080/api/mq-demo/rabbitmq/normal
+  curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/rabbitmq/duplicate?messageId=MSG-DEMO-1'
+  curl -s -XPOST http://127.0.0.1:8080/api/mq-demo/rabbitmq/dead-letter
+  curl -s 'http://127.0.0.1:8080/api/mq-demo/rabbitmq/dlq/incidents?status=PENDING'
+  curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/rabbitmq/dlq/incidents/<incidentId>/resolve?compensationNote=order%20status%20fixed%20manually'
+  curl -s -XPOST http://127.0.0.1:8080/api/mq-demo/rabbitmq/unroutable
+  curl -s -XPOST http://127.0.0.1:8080/api/mq-demo/rabbitmq/topic
+  curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/rabbitmq/topic?routingKey=hotel.booking.payment.timeout'
+  curl -s -XPOST http://127.0.0.1:8080/api/mq-demo/rabbitmq/fanout
+  curl -s http://127.0.0.1:8080/api/mq-demo/rabbitmq/status
 
 RabbitMQ Console:
   Queues and Streams -> hotel.booking.created.queue
@@ -182,15 +183,16 @@ Learn: topic, partition, producer ack, key ordering, consumer group, offset, lag
 
 Open:
   Gateway: http://127.0.0.1:8080
+  Nacos:   http://127.0.0.1:8848/nacos
 
 Verify:
-  curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/normal?key=room-101'
-  curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/key-order?key=room-101&count=5'
-  curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/group?count=9'
-  curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/duplicate?messageId=KMSG-DEMO-DUP'
-  curl -s -XPOST 'http://127.0.0.1:8080/api/messages/kafka/demo/dead-letter?key=room-102'
+  curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/normal?key=room-101'
+  curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/key-order?key=room-101&count=5'
+  curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/group?count=9'
+  curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/duplicate?messageId=KMSG-DEMO-DUP'
+  curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/dead-letter?key=room-102'
   sleep 3
-  curl -s http://127.0.0.1:8080/api/messages/kafka/demo/status
+  curl -s http://127.0.0.1:8080/api/mq-demo/kafka/status
 
 CLI:
   docker exec hotel-demo-kafka /opt/kafka/bin/kafka-topics.sh \
@@ -319,26 +321,30 @@ case "$LAB" in
     wait_http "gateway-service" "http://127.0.0.1:8080/actuator/health" 60
     ;;
   rabbitmq)
-    build_modules "gateway-service,message-service"
+    build_modules "gateway-service,mq-demo-bff-service,message-service"
     stop_old_lab
-    # RabbitMQ lab 只启动 Nacos、RabbitMQ、Gateway、message-service，避免无关服务占用内存。
+    # RabbitMQ lab 只启动 Nacos、RabbitMQ、Gateway、MQ demo BFF、message-service，避免无关服务占用内存。
     docker compose --profile rabbitmq up -d nacos rabbitmq
     wait_http "Nacos" "http://127.0.0.1:8848/nacos/v1/console/health/readiness" 60
+    "$PWD/scripts/publish-app-configs-to-nacos.sh"
     # RabbitMQ 先健康后再启动 Java 服务，否则启动初期容易看到连接失败重试日志。
     wait_healthy "hotel-demo-rabbitmq" 60
-    docker compose --profile rabbitmq up -d --build gateway-service message-service
+    docker compose --profile rabbitmq up -d --build gateway-service message-service mq-demo-bff-service
     wait_http "message-service" "http://127.0.0.1:8085/actuator/health" 60
+    wait_http "mq-demo-bff-service" "http://127.0.0.1:8089/actuator/health" 60
     wait_http "gateway-service" "http://127.0.0.1:8080/actuator/health" 60
     ;;
   kafka)
-    build_modules "gateway-service,message-service"
+    build_modules "gateway-service,mq-demo-bff-service,message-service"
     stop_old_lab
     docker compose --profile kafka up -d nacos rabbitmq kafka
     wait_http "Nacos" "http://127.0.0.1:8848/nacos/v1/console/health/readiness" 60
+    "$PWD/scripts/publish-app-configs-to-nacos.sh"
     wait_healthy "hotel-demo-rabbitmq" 60
     wait_healthy "hotel-demo-kafka" 90
-    docker compose --profile kafka up -d --build gateway-service message-service
+    docker compose --profile kafka up -d --build gateway-service message-service mq-demo-bff-service
     wait_http "message-service" "http://127.0.0.1:8085/actuator/health" 90
+    wait_http "mq-demo-bff-service" "http://127.0.0.1:8089/actuator/health" 90
     wait_http "gateway-service" "http://127.0.0.1:8080/actuator/health" 90
     ;;
   sentinel)
@@ -386,9 +392,10 @@ case "$LAB" in
     stop_old_lab
     docker compose --profile full up -d nacos sentinel-dashboard rabbitmq kafka seata-server
     wait_http "Nacos" "http://127.0.0.1:8848/nacos/v1/console/health/readiness" 60
+    "$PWD/scripts/publish-app-configs-to-nacos.sh"
     wait_healthy "hotel-demo-rabbitmq" 60
     wait_healthy "hotel-demo-kafka" 90
-    docker compose --profile full up -d --build gateway-service user-service hotel-service order-service payment-service message-service kafka-ui
+    docker compose --profile full up -d --build gateway-service user-service hotel-service order-service payment-service message-service mq-demo-bff-service kafka-ui
     ;;
 esac
 

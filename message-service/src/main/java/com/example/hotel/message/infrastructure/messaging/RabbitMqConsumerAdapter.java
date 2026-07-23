@@ -1,10 +1,11 @@
 package com.example.hotel.message.infrastructure.messaging;
 
 import com.example.hotel.message.application.port.out.RabbitMqDlqIncidentStore;
+import com.example.hotel.message.application.port.out.RabbitMqTopology;
 import com.example.hotel.message.application.service.RabbitMqDemoMetrics;
 import com.example.hotel.message.domain.model.RabbitMqBookingMessage;
 import com.example.hotel.message.domain.model.RabbitMqDlqIncident;
-import com.example.hotel.message.infrastructure.config.RabbitMqDemoConfig;
+import com.example.hotel.message.infrastructure.config.RabbitMqDemoProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import org.slf4j.Logger;
@@ -33,16 +34,22 @@ public class RabbitMqConsumerAdapter {
     private final ObjectMapper objectMapper;
     private final RabbitMqDlqIncidentStore dlqIncidentStore;
     private final RabbitMqDemoMetrics metrics;
+    private final RabbitMqTopology topology;
+    private final RabbitMqDemoProperties properties;
 
     public RabbitMqConsumerAdapter(ObjectMapper objectMapper,
                                    RabbitMqDlqIncidentStore dlqIncidentStore,
-                                   RabbitMqDemoMetrics metrics) {
+                                   RabbitMqDemoMetrics metrics,
+                                   RabbitMqTopology topology,
+                                   RabbitMqDemoProperties properties) {
         this.objectMapper = objectMapper;
         this.dlqIncidentStore = dlqIncidentStore;
         this.metrics = metrics;
+        this.topology = topology;
+        this.properties = properties;
     }
 
-    @RabbitListener(queues = RabbitMqDemoConfig.BOOKING_QUEUE, ackMode = "MANUAL")
+    @RabbitListener(queues = "${hotel.rabbitmq.demo.booking-queue:hotel.booking.created.queue}", ackMode = "MANUAL")
     public void consume(RabbitMqBookingMessage payload, Message rawMessage, Channel channel) throws IOException {
         long deliveryTag = rawMessage.getMessageProperties().getDeliveryTag();
         String messageId = rawMessage.getMessageProperties().getMessageId();
@@ -69,7 +76,7 @@ public class RabbitMqConsumerAdapter {
         channel.basicAck(deliveryTag, false);
     }
 
-    @RabbitListener(queues = RabbitMqDemoConfig.BOOKING_DLQ, ackMode = "MANUAL")
+    @RabbitListener(queues = "${hotel.rabbitmq.demo.dead-letter-queue:hotel.booking.created.dlq}", ackMode = "MANUAL")
     public void captureDeadLetterIncident(Message rawMessage, Channel channel) throws IOException {
         long deliveryTag = rawMessage.getMessageProperties().getDeliveryTag();
         try {
@@ -84,7 +91,7 @@ public class RabbitMqConsumerAdapter {
             RabbitMqDlqIncident incident = dlqIncidentStore.insertPendingIfAbsent(
                     "INC-" + UUID.randomUUID().toString().substring(0, 8),
                     sourceKey,
-                    RabbitMqDemoConfig.BOOKING_DLQ,
+                    topology.deadLetterQueue(),
                     messageId,
                     orderId,
                     firstDeathReason(rawMessage.getMessageProperties().getHeaders()),
@@ -102,7 +109,7 @@ public class RabbitMqConsumerAdapter {
         }
     }
 
-    @RabbitListener(queues = RabbitMqDemoConfig.BOOKING_TOPIC_SINGLE_WORD_QUEUE, ackMode = "MANUAL")
+    @RabbitListener(queues = "${hotel.rabbitmq.demo.topic-single-word-queue:hotel.booking.topic.single-word.queue}", ackMode = "MANUAL")
     public void consumeTopicSingleWord(RabbitMqBookingMessage payload,
                                        Message rawMessage,
                                        Channel channel) throws IOException {
@@ -110,13 +117,13 @@ public class RabbitMqConsumerAdapter {
         String routingKey = rawMessage.getMessageProperties().getReceivedRoutingKey();
         metrics.topicWildcardConsumed();
         record(payload.messageId(), payload.orderId(), "topic-single-word-consumed",
-                "queue=" + RabbitMqDemoConfig.BOOKING_TOPIC_SINGLE_WORD_QUEUE
-                        + "; binding=" + RabbitMqDemoConfig.BOOKING_TOPIC_SINGLE_WORD_PATTERN
+                "queue=" + properties.getTopicSingleWordQueue()
+                        + "; binding=" + properties.getTopicSingleWordPattern()
                         + "; routingKey=" + routingKey);
         channel.basicAck(deliveryTag, false);
     }
 
-    @RabbitListener(queues = RabbitMqDemoConfig.BOOKING_TOPIC_MULTI_WORD_QUEUE, ackMode = "MANUAL")
+    @RabbitListener(queues = "${hotel.rabbitmq.demo.topic-multi-word-queue:hotel.booking.topic.multi-word.queue}", ackMode = "MANUAL")
     public void consumeTopicMultiWord(RabbitMqBookingMessage payload,
                                       Message rawMessage,
                                       Channel channel) throws IOException {
@@ -124,31 +131,31 @@ public class RabbitMqConsumerAdapter {
         String routingKey = rawMessage.getMessageProperties().getReceivedRoutingKey();
         metrics.topicWildcardConsumed();
         record(payload.messageId(), payload.orderId(), "topic-multi-word-consumed",
-                "queue=" + RabbitMqDemoConfig.BOOKING_TOPIC_MULTI_WORD_QUEUE
-                        + "; binding=" + RabbitMqDemoConfig.BOOKING_TOPIC_MULTI_WORD_PATTERN
+                "queue=" + properties.getTopicMultiWordQueue()
+                        + "; binding=" + properties.getTopicMultiWordPattern()
                         + "; routingKey=" + routingKey);
         channel.basicAck(deliveryTag, false);
     }
 
-    @RabbitListener(queues = RabbitMqDemoConfig.BOOKING_FANOUT_SMS_QUEUE, ackMode = "MANUAL")
+    @RabbitListener(queues = "${hotel.rabbitmq.demo.fanout-sms-queue:hotel.booking.fanout.sms.queue}", ackMode = "MANUAL")
     public void consumeFanoutSms(RabbitMqBookingMessage payload,
                                  Message rawMessage,
                                  Channel channel) throws IOException {
         long deliveryTag = rawMessage.getMessageProperties().getDeliveryTag();
         metrics.fanoutBroadcastConsumed();
         record(payload.messageId(), payload.orderId(), "fanout-sms-consumed",
-                "queue=" + RabbitMqDemoConfig.BOOKING_FANOUT_SMS_QUEUE + "; routing key ignored by fanout exchange");
+                "queue=" + properties.getFanoutSmsQueue() + "; routing key ignored by fanout exchange");
         channel.basicAck(deliveryTag, false);
     }
 
-    @RabbitListener(queues = RabbitMqDemoConfig.BOOKING_FANOUT_POINTS_QUEUE, ackMode = "MANUAL")
+    @RabbitListener(queues = "${hotel.rabbitmq.demo.fanout-points-queue:hotel.booking.fanout.points.queue}", ackMode = "MANUAL")
     public void consumeFanoutPoints(RabbitMqBookingMessage payload,
                                     Message rawMessage,
                                     Channel channel) throws IOException {
         long deliveryTag = rawMessage.getMessageProperties().getDeliveryTag();
         metrics.fanoutBroadcastConsumed();
         record(payload.messageId(), payload.orderId(), "fanout-points-consumed",
-                "queue=" + RabbitMqDemoConfig.BOOKING_FANOUT_POINTS_QUEUE + "; same broadcast message copy");
+                "queue=" + properties.getFanoutPointsQueue() + "; same broadcast message copy");
         channel.basicAck(deliveryTag, false);
     }
 
@@ -178,7 +185,7 @@ public class RabbitMqConsumerAdapter {
         if (stableId == null || stableId.isBlank()) {
             stableId = sha256(payloadJson);
         }
-        return RabbitMqDemoConfig.BOOKING_DLQ + ":" + stableId;
+        return topology.deadLetterQueue() + ":" + stableId;
     }
 
     private String sha256(String value) {

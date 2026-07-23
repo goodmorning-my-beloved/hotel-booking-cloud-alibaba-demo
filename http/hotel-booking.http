@@ -16,10 +16,10 @@ Content-Type: application/json
 GET http://localhost:8080/api/orders
 
 ### See RabbitMQ and Kafka consumed events
-GET http://localhost:8080/api/messages/booking-events
+GET http://localhost:8080/api/mq-demo/booking-events
 
 ### See RabbitMQ consumed events
-GET http://localhost:8080/api/messages/booking-events/rabbitmq
+GET http://localhost:8080/api/mq-demo/booking-events/rabbitmq
 
 ### See Kafka consumed events
-GET http://localhost:8080/api/messages/booking-events/kafka
+GET http://localhost:8080/api/mq-demo/booking-events/kafka

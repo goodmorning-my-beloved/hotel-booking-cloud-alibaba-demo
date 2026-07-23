@@ -25,6 +25,12 @@ spring:
           enabled: true
           lower-case-service-id: true
       routes:
+        - id: mq-demo-bff
+          uri: lb://mq-demo-bff-service
+          predicates:
+            - Path=/api/mq-demo/**
+          filters:
+            - StripPrefix=1
         - id: sentinel-chain-bff
           uri: lb://sentinel-bff-service
           predicates:

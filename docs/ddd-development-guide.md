@@ -174,6 +174,8 @@ PaymentGateway
 
 服务提供方在自己的 `interfaces/rest/dto` 中定义对外 HTTP 协议；调用方在自己的 `infrastructure/client/dto` 中定义它所理解的远端协议。例如订单上下文使用 `UserApiResponse`、`RoomApiResponse`、`PaymentApiResponse`，再由 Feign Adapter 翻译成本地的 `UserProfile`、`RoomOffer`、`PaymentReceipt`。这层翻译就是简化的防腐层。
 
+消息协议遵循同一规则：`order-service` 发布自己的 `BookingCreatedMessage`，`message-service` 用入站边界内的同名线级 DTO 反序列化，再映射成本上下文的 `BookingCreatedDetails`。字段结构兼容不等于共享 Java 类，从而避免一个上下文修改 DTO 时把另一个上下文一起编译耦合。
+
 ```text
 payment-service/interfaces/rest/dto/PayOrderRequest
     支付上下文拥有的入站协议

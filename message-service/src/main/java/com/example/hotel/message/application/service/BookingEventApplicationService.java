@@ -1,6 +1,6 @@
 package com.example.hotel.message.application.service;
 
-import com.example.hotel.common.dto.BookingCreatedEvent;
+import com.example.hotel.message.domain.model.BookingCreatedDetails;
 import com.example.hotel.message.domain.model.ReceivedBookingEvent;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +21,7 @@ public class BookingEventApplicationService {
 
     private final List<ReceivedBookingEvent> receivedEvents = new ArrayList<>();
 
-    public void record(String source, BookingCreatedEvent event) {
+    public void record(String source, BookingCreatedDetails event) {
         synchronized (receivedEvents) {
             receivedEvents.add(new ReceivedBookingEvent(source, event, Instant.now()));
             if (receivedEvents.size() > MAX_RECENT_EVENTS) {

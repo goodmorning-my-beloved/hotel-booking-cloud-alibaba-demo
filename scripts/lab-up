@@ -179,7 +179,8 @@ EOF
       cat <<'EOF'
 
 Kafka lab is up. Kafka UI is intentionally not started.
-Learn: topic, partition, producer ack, key ordering, consumer group, offset, lag, idempotency, retry, DLT.
+Learn: topic, partition, producer ack, ordering, groups, offset/lag, database idempotency,
+async batch/compression, retry/DLT, poison payloads, and Kafka transactions.
 
 Open:
   Gateway: http://127.0.0.1:8080
@@ -189,8 +190,12 @@ Verify:
   curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/normal?key=room-101'
   curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/key-order?key=room-101&count=5'
   curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/group?count=9'
+  curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/async-batch?count=20'
   curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/duplicate?messageId=KMSG-DEMO-DUP'
   curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/dead-letter?key=room-102'
+  curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/poison?key=room-103'
+  curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/transaction?failAfterFirst=false'
+  curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/transaction?failAfterFirst=true'
   sleep 3
   curl -s http://127.0.0.1:8080/api/mq-demo/kafka/status
 

@@ -1,6 +1,6 @@
 package com.example.hotel.message.application.service;
 
-import com.example.hotel.common.dto.BookingCreatedEvent;
+import com.example.hotel.message.domain.model.BookingCreatedDetails;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -14,7 +14,7 @@ class BookingEventApplicationServiceTest {
 
     @Test
     void recordsAndFiltersReceivedBookingEvents() {
-        BookingCreatedEvent event = new BookingCreatedEvent(
+        BookingCreatedDetails event = new BookingCreatedDetails(
                 "ORD-1", 1L, 101L, new BigDecimal("688.00"), Instant.parse("2026-07-22T00:00:00Z"));
 
         service.record("rabbitmq", event);

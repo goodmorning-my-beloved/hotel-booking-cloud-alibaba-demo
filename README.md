@@ -195,7 +195,12 @@ DLQ 是失败现场，不是工单系统；DLQ Listener 先把死信落成 PENDI
 - key 决定 partition，同一 key 在同一 partition 内有序。
 - consumer group 内负载均衡，group 间各自消费一份。
 - offset 表示消费进度，lag 表示消费积压。
-- 重复消费要靠业务幂等，失败消息应有限重试后进 DLT。
+- 异步批量、linger 和 LZ4 压缩提高吞吐。
+- 数据库唯一键保证消费者业务幂等，服务重启后仍有效。
+- 失败消息有限阻塞重试后进入 DLT，非法 JSON 也能保留原始 payload。
+- DLT 先落持久化工单再提交 offset，支持人工闭环。
+- Kafka transaction 和 `read_committed` 演示多消息原子可见。
+- pause/resume 可以稳定观察 committed offset 和 lag。
 
 这个 lab 不启动 Kafka UI、订单、支付、Seata、Sentinel 和前端构建，减少内存占用。演示请求链路是 `gateway-service -> mq-demo-bff-service -> message-service`。RabbitMQ 只是为了满足 `message-service` 当前已有 RabbitMQ demo bean 的运行前提。
 
@@ -205,8 +210,12 @@ DLQ 是失败现场，不是工单系统；DLQ Listener 先把死信落成 PENDI
 curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/normal?key=room-101'
 curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/key-order?key=room-101&count=5'
 curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/group?count=9'
+curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/async-batch?count=20'
 curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/duplicate?messageId=KMSG-DEMO-DUP'
 curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/dead-letter?key=room-102'
+curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/poison?key=room-103'
+curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/transaction?failAfterFirst=false'
+curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/transaction?failAfterFirst=true'
 sleep 3
 curl -s http://127.0.0.1:8080/api/mq-demo/kafka/status
 ```
@@ -223,6 +232,8 @@ docker exec hotel-demo-kafka /opt/kafka/bin/kafka-consumer-groups.sh \
 ```
 
 快速手册：[docs/kafka-quick-start-guide.md](docs/kafka-quick-start-guide.md)。
+
+覆盖 85% 高频题的系统面试主线：[docs/kafka-interview-guide.md](docs/kafka-interview-guide.md)。
 
 停止：
 

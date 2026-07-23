@@ -13,7 +13,7 @@ spring:
     password:
   sql:
     init:
-      # 启动 message-service 时自动创建 mq_outbox_message 表。
+      # 启动时以幂等 DDL 创建 RabbitMQ outbox/DLQ 和 Kafka 去重/DLT 工单表。
       mode: always
   config:
     import: optional:nacos:${spring.application.name}.yaml

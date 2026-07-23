@@ -1,10 +1,14 @@
 package com.example.hotel.message.application.service;
 
+import com.example.hotel.message.application.port.out.KafkaDemoConsumerControl;
+import com.example.hotel.message.application.port.out.KafkaDemoDltIncidentStore;
+import com.example.hotel.message.application.port.out.KafkaDemoIdempotencyStore;
 import com.example.hotel.message.application.port.out.KafkaDemoInspector;
 import com.example.hotel.message.application.port.out.KafkaDemoMessagePublisher;
 import com.example.hotel.message.application.port.out.KafkaDemoTopology;
 import com.example.hotel.message.application.result.KafkaDemoPublishResult;
 import com.example.hotel.message.application.result.KafkaDemoStatus;
+import com.example.hotel.message.application.result.KafkaDemoTransactionResult;
 import com.example.hotel.message.domain.model.KafkaDemoMessage;
 import org.springframework.stereotype.Service;
 
@@ -24,15 +28,24 @@ public class KafkaDemoApplicationService {
     private final KafkaDemoTopology topology;
     private final KafkaDemoInspector inspector;
     private final KafkaDemoMetrics metrics;
+    private final KafkaDemoIdempotencyStore idempotencyStore;
+    private final KafkaDemoDltIncidentStore dltIncidentStore;
+    private final KafkaDemoConsumerControl consumerControl;
 
     public KafkaDemoApplicationService(KafkaDemoMessagePublisher messagePublisher,
                                        KafkaDemoTopology topology,
                                        KafkaDemoInspector inspector,
-                                       KafkaDemoMetrics metrics) {
+                                       KafkaDemoMetrics metrics,
+                                       KafkaDemoIdempotencyStore idempotencyStore,
+                                       KafkaDemoDltIncidentStore dltIncidentStore,
+                                       KafkaDemoConsumerControl consumerControl) {
         this.messagePublisher = messagePublisher;
         this.topology = topology;
         this.inspector = inspector;
         this.metrics = metrics;
+        this.idempotencyStore = idempotencyStore;
+        this.dltIncidentStore = dltIncidentStore;
+        this.consumerControl = consumerControl;
     }
 
     public KafkaDemoPublishResult publishNormal(String messageId, String key) {
@@ -57,12 +70,27 @@ public class KafkaDemoApplicationService {
         int size = normalizeBatchSize(count);
         List<KafkaDemoPublishResult> results = new ArrayList<>();
         for (int i = 0; i < size; i++) {
-            String key = "group-demo-" + (i % 3);
+            String key = topology.keyForPartition(i % topology.partitionCount());
             KafkaDemoMessage message = newMessage(null, key, false);
             results.add(messagePublisher.publish(topology.demoTopic(), message,
-                    "consumer group demo: partitions are shared by consumers in the same group; index=" + i));
+                    "consumer group demo: generated key targets partition "
+                            + (i % topology.partitionCount()) + "; index=" + i));
         }
         return results;
+    }
+
+    public List<KafkaDemoPublishResult> publishAsyncBatch(int count) {
+        int size = normalizeBatchSize(count);
+        List<KafkaDemoMessage> messages = new ArrayList<>();
+        for (int i = 0; i < size; i++) {
+            messages.add(newMessage(null,
+                    topology.keyForPartition(i % topology.partitionCount()),
+                    false));
+        }
+        return messagePublisher.publishAsyncBatch(
+                topology.demoTopic(),
+                messages,
+                "async batch: producer can combine records using batch.size, linger.ms and compression");
     }
 
     public List<KafkaDemoPublishResult> publishDuplicate(String messageId) {
@@ -90,6 +118,48 @@ public class KafkaDemoApplicationService {
                 "consumer will fail, retry, then publish to the DLT");
     }
 
+    public KafkaDemoPublishResult publishPoison(String key) {
+        String messageId = "KMSG-POISON-" + UUID.randomUUID().toString().substring(0, 8);
+        byte[] invalidJson = ("{\"messageId\":\"" + messageId
+                + "\",\"businessKey\":\"" + normalizeKey(key)
+                + "\",\"amount\":not-valid-json").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return messagePublisher.publishRaw(
+                topology.demoTopic(),
+                messageId,
+                normalizeKey(key),
+                invalidJson,
+                "invalid JSON: ErrorHandlingDeserializer sends it directly to DLT without blocking the partition");
+    }
+
+    public KafkaDemoTransactionResult publishTransaction(boolean failAfterFirst) {
+        String transactionKey = "transaction-" + UUID.randomUUID().toString().substring(0, 8);
+        return messagePublisher.publishTransaction(
+                topology.demoTopic(),
+                List.of(
+                        newMessage(null, transactionKey, false),
+                        newMessage(null, transactionKey, false)),
+                failAfterFirst);
+    }
+
+    public KafkaDemoStatus pausePrimaryConsumer() {
+        consumerControl.pausePrimary();
+        return status();
+    }
+
+    public KafkaDemoStatus resumePrimaryConsumer() {
+        consumerControl.resumePrimary();
+        return status();
+    }
+
+    public KafkaDemoStatus resolveDltIncident(String incidentId, String resolutionNote) {
+        dltIncidentStore.resolve(
+                incidentId,
+                resolutionNote == null || resolutionNote.isBlank()
+                        ? "verified and resolved manually"
+                        : resolutionNote);
+        return status();
+    }
+
     public KafkaDemoStatus status() {
         KafkaDemoMetrics.Snapshot snapshot = metrics.snapshot();
         return new KafkaDemoStatus(
@@ -98,6 +168,7 @@ public class KafkaDemoApplicationService {
                 topology.primaryConsumerGroup(),
                 topology.auditConsumerGroup(),
                 topology.deadLetterConsumerGroup(),
+                consumerControl.primaryPauseRequested(),
                 snapshot.published(),
                 snapshot.publishAcked(),
                 snapshot.consumed(),
@@ -105,7 +176,11 @@ public class KafkaDemoApplicationService {
                 snapshot.duplicated(),
                 snapshot.failedForRetry(),
                 snapshot.deadLettered(),
-                snapshot.processedMessageIds(),
+                snapshot.poisonPublished(),
+                snapshot.transactionsCommitted(),
+                snapshot.transactionsAborted(),
+                idempotencyStore.recentProcessedMessageIds(100),
+                dltIncidentStore.recent(50),
                 snapshot.recentEvents(),
                 inspector.topics(),
                 inspector.consumerLags());

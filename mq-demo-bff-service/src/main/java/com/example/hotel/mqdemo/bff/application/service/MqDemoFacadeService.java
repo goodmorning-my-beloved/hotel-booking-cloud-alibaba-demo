@@ -73,12 +73,36 @@ public class MqDemoFacadeService {
         return messageDemoGateway.publishKafkaConsumerGroupBatch(count);
     }
 
+    public ApiResponse<Object> publishKafkaAsyncBatch(int count) {
+        return messageDemoGateway.publishKafkaAsyncBatch(count);
+    }
+
     public ApiResponse<Object> publishKafkaDuplicate(String messageId) {
         return messageDemoGateway.publishKafkaDuplicate(messageId);
     }
 
     public ApiResponse<Object> publishKafkaDeadLetter(String messageId, String key) {
         return messageDemoGateway.publishKafkaDeadLetter(messageId, key);
+    }
+
+    public ApiResponse<Object> publishKafkaPoison(String key) {
+        return messageDemoGateway.publishKafkaPoison(key);
+    }
+
+    public ApiResponse<Object> publishKafkaTransaction(boolean failAfterFirst) {
+        return messageDemoGateway.publishKafkaTransaction(failAfterFirst);
+    }
+
+    public ApiResponse<Object> pauseKafkaPrimaryConsumer() {
+        return messageDemoGateway.pauseKafkaPrimaryConsumer();
+    }
+
+    public ApiResponse<Object> resumeKafkaPrimaryConsumer() {
+        return messageDemoGateway.resumeKafkaPrimaryConsumer();
+    }
+
+    public ApiResponse<Object> resolveKafkaDltIncident(String incidentId, String resolutionNote) {
+        return messageDemoGateway.resolveKafkaDltIncident(incidentId, resolutionNote);
     }
 
     public ApiResponse<Object> kafkaStatus() {

@@ -82,7 +82,7 @@ Feign 的核心价值是把 HTTP 调用写成 Java 接口，并结合服务发�
 
 同一笔订单创建后也会发送到 Kafka topic `hotel-booking-created`，`message-service` 使用消费者组 `message-service` 消费。
 
-另外 Kafka Lab 在 `message-service` 里提供了一套独立接口，topic 是 `hotel.kafka.demo.orders`，DLT 是 `hotel.kafka.demo.orders.DLT`。快速手册见 [kafka-quick-start-guide.md](kafka-quick-start-guide.md)。
+另外 Kafka Lab 在 `message-service` 里提供了一套独立接口，topic 是 `hotel.kafka.demo.orders`，DLT 是 `hotel.kafka.demo.orders.DLT`。动手实验见 [kafka-quick-start-guide.md](kafka-quick-start-guide.md)，系统回答框架见 [kafka-interview-guide.md](kafka-interview-guide.md)。
 
 常见追问：
 

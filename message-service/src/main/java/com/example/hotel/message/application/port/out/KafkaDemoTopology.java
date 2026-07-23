@@ -14,6 +14,10 @@ public interface KafkaDemoTopology {
 
     String deadLetterConsumerGroup();
 
+    int partitionCount();
+
+    String keyForPartition(int partition);
+
     List<String> demoTopics();
 
     List<String> demoConsumerGroups();

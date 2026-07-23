@@ -410,6 +410,9 @@ services:
         required: false
     environment:
       <<: *app-env
+    volumes:
+      # 保存 RabbitMQ outbox、Kafka 消费幂等记录和 DLT 工单；compose down 不会删除该 volume。
+      - message-service-data:/app/data
     ports:
       - "8085:8085"
     networks:
@@ -418,3 +421,6 @@ services:
 networks:
   hotel-demo:
     driver: bridge
+
+volumes:
+  message-service-data:

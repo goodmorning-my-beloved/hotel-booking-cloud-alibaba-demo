@@ -109,6 +109,12 @@ public class MqDemoController {
         return facadeService.publishKafkaConsumerGroupBatch(count);
     }
 
+    @PostMapping("/kafka/async-batch")
+    public ApiResponse<Object> publishKafkaAsyncBatch(
+            @RequestParam(value = "count", defaultValue = "20") int count) {
+        return facadeService.publishKafkaAsyncBatch(count);
+    }
+
     @PostMapping("/kafka/duplicate")
     public ApiResponse<Object> publishKafkaDuplicate(
             @RequestParam(value = "messageId", required = false) String messageId) {
@@ -120,6 +126,35 @@ public class MqDemoController {
             @RequestParam(value = "messageId", required = false) String messageId,
             @RequestParam(value = "key", required = false) String key) {
         return facadeService.publishKafkaDeadLetter(messageId, key);
+    }
+
+    @PostMapping("/kafka/poison")
+    public ApiResponse<Object> publishKafkaPoison(
+            @RequestParam(value = "key", required = false) String key) {
+        return facadeService.publishKafkaPoison(key);
+    }
+
+    @PostMapping("/kafka/transaction")
+    public ApiResponse<Object> publishKafkaTransaction(
+            @RequestParam(value = "failAfterFirst", defaultValue = "false") boolean failAfterFirst) {
+        return facadeService.publishKafkaTransaction(failAfterFirst);
+    }
+
+    @PostMapping("/kafka/consumer/pause")
+    public ApiResponse<Object> pauseKafkaPrimaryConsumer() {
+        return facadeService.pauseKafkaPrimaryConsumer();
+    }
+
+    @PostMapping("/kafka/consumer/resume")
+    public ApiResponse<Object> resumeKafkaPrimaryConsumer() {
+        return facadeService.resumeKafkaPrimaryConsumer();
+    }
+
+    @PostMapping("/kafka/dlt/incidents/{incidentId}/resolve")
+    public ApiResponse<Object> resolveKafkaDltIncident(
+            @org.springframework.web.bind.annotation.PathVariable("incidentId") String incidentId,
+            @RequestParam(value = "resolutionNote", required = false) String resolutionNote) {
+        return facadeService.resolveKafkaDltIncident(incidentId, resolutionNote);
     }
 
     @GetMapping("/kafka/status")

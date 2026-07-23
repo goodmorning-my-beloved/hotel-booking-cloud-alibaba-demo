@@ -1,9 +1,12 @@
 package com.example.hotel.message.application.service;
 
 import com.example.hotel.message.application.port.out.KafkaDemoInspector;
+import com.example.hotel.message.application.port.out.KafkaDemoIdempotencyStore;
 import com.example.hotel.message.application.port.out.KafkaDemoMessagePublisher;
 import com.example.hotel.message.application.port.out.KafkaDemoTopology;
 import com.example.hotel.message.application.result.KafkaDemoPublishResult;
+import com.example.hotel.message.application.result.KafkaDemoTransactionResult;
+import com.example.hotel.message.domain.model.KafkaDemoDltIncident;
 import com.example.hotel.message.domain.model.KafkaDemoMessage;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +25,10 @@ class KafkaDemoApplicationServiceTest {
             publisher,
             topology,
             new EmptyInspector(),
-            metrics);
+            metrics,
+            new EmptyIdempotencyStore(),
+            new EmptyDltStore(),
+            new NoopConsumerControl());
 
     @Test
     void publishesSameKeyMessagesToDemoTopic() {
@@ -78,6 +84,41 @@ class KafkaDemoApplicationServiceTest {
                     note,
                     Instant.now());
         }
+
+        @Override
+        public List<KafkaDemoPublishResult> publishAsyncBatch(String topic,
+                                                              List<KafkaDemoMessage> messages,
+                                                              String note) {
+            return messages.stream().map(message -> publish(topic, message, note)).toList();
+        }
+
+        @Override
+        public KafkaDemoPublishResult publishRaw(String topic,
+                                                 String messageId,
+                                                 String businessKey,
+                                                 byte[] payload,
+                                                 String note) {
+            metrics.published();
+            metrics.publishAcked();
+            return new KafkaDemoPublishResult(
+                    messageId, null, businessKey, topic, 0, offset++, true, note, Instant.now());
+        }
+
+        @Override
+        public KafkaDemoTransactionResult publishTransaction(String topic,
+                                                             List<KafkaDemoMessage> messages,
+                                                             boolean failAfterFirst) {
+            if (failAfterFirst) {
+                return new KafkaDemoTransactionResult(
+                        false, messages.size(), List.of(), "aborted", Instant.now());
+            }
+            return new KafkaDemoTransactionResult(
+                    true,
+                    messages.size(),
+                    publishAsyncBatch(topic, messages, "transaction"),
+                    "committed",
+                    Instant.now());
+        }
     }
 
     private static class FakeTopology implements KafkaDemoTopology {
@@ -108,6 +149,16 @@ class KafkaDemoApplicationServiceTest {
         }
 
         @Override
+        public int partitionCount() {
+            return 3;
+        }
+
+        @Override
+        public String keyForPartition(int partition) {
+            return "partition-key-" + partition;
+        }
+
+        @Override
         public List<String> demoTopics() {
             return List.of(demoTopic(), deadLetterTopic());
         }
@@ -128,6 +179,54 @@ class KafkaDemoApplicationServiceTest {
         @Override
         public List<com.example.hotel.message.domain.model.KafkaDemoConsumerLag> consumerLags() {
             return List.of();
+        }
+    }
+
+    private static class EmptyIdempotencyStore implements KafkaDemoIdempotencyStore {
+
+        @Override
+        public boolean processOnce(KafkaDemoMessage message) {
+            return true;
+        }
+
+        @Override
+        public List<String> recentProcessedMessageIds(int limit) {
+            return List.of();
+        }
+    }
+
+    private static class EmptyDltStore
+            implements com.example.hotel.message.application.port.out.KafkaDemoDltIncidentStore {
+
+        @Override
+        public KafkaDemoDltIncident saveIfAbsent(KafkaDemoDltIncident incident, String payloadBase64) {
+            return incident;
+        }
+
+        @Override
+        public List<KafkaDemoDltIncident> recent(int limit) {
+            return List.of();
+        }
+
+        @Override
+        public void resolve(String incidentId, String resolutionNote) {
+        }
+    }
+
+    private static class NoopConsumerControl
+            implements com.example.hotel.message.application.port.out.KafkaDemoConsumerControl {
+
+        @Override
+        public void pausePrimary() {
+        }
+
+        @Override
+        public void resumePrimary() {
+        }
+
+        @Override
+        public boolean primaryPauseRequested() {
+            return false;
         }
     }
 }

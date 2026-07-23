@@ -5,6 +5,7 @@ import com.example.hotel.message.application.service.BookingEventApplicationServ
 import com.example.hotel.message.application.service.KafkaDemoApplicationService;
 import com.example.hotel.message.application.result.KafkaDemoPublishResult;
 import com.example.hotel.message.application.result.KafkaDemoStatus;
+import com.example.hotel.message.application.result.KafkaDemoTransactionResult;
 import com.example.hotel.message.application.service.RabbitMqDemoApplicationService;
 import com.example.hotel.message.application.result.RabbitMqDemoPublishResult;
 import com.example.hotel.message.application.result.RabbitMqDemoStatus;
@@ -143,6 +144,12 @@ public class MessageController {
         return ApiResponse.ok(kafkaDemoService.publishConsumerGroupBatch(count));
     }
 
+    @PostMapping("/kafka/demo/async-batch")
+    public ApiResponse<List<KafkaDemoPublishResult>> publishKafkaAsyncBatch(
+            @RequestParam(value = "count", defaultValue = "20") int count) {
+        return ApiResponse.ok(kafkaDemoService.publishAsyncBatch(count));
+    }
+
     @PostMapping("/kafka/demo/duplicate")
     public ApiResponse<List<KafkaDemoPublishResult>> publishKafkaDuplicate(
             @RequestParam(value = "messageId", required = false) String messageId) {
@@ -156,6 +163,35 @@ public class MessageController {
             @RequestParam(value = "key", required = false) String key) {
         // 失败重试和 DLT 演示：消费者抛异常，重试耗尽后进入 hotel.kafka.demo.orders.DLT。
         return ApiResponse.ok(kafkaDemoService.publishDeadLetter(messageId, key));
+    }
+
+    @PostMapping("/kafka/demo/poison")
+    public ApiResponse<KafkaDemoPublishResult> publishKafkaPoison(
+            @RequestParam(value = "key", required = false) String key) {
+        return ApiResponse.ok(kafkaDemoService.publishPoison(key));
+    }
+
+    @PostMapping("/kafka/demo/transaction")
+    public ApiResponse<KafkaDemoTransactionResult> publishKafkaTransaction(
+            @RequestParam(value = "failAfterFirst", defaultValue = "false") boolean failAfterFirst) {
+        return ApiResponse.ok(kafkaDemoService.publishTransaction(failAfterFirst));
+    }
+
+    @PostMapping("/kafka/demo/consumer/pause")
+    public ApiResponse<KafkaDemoStatus> pauseKafkaPrimaryConsumer() {
+        return ApiResponse.ok(kafkaDemoService.pausePrimaryConsumer());
+    }
+
+    @PostMapping("/kafka/demo/consumer/resume")
+    public ApiResponse<KafkaDemoStatus> resumeKafkaPrimaryConsumer() {
+        return ApiResponse.ok(kafkaDemoService.resumePrimaryConsumer());
+    }
+
+    @PostMapping("/kafka/demo/dlt/incidents/{incidentId}/resolve")
+    public ApiResponse<KafkaDemoStatus> resolveKafkaDltIncident(
+            @PathVariable("incidentId") String incidentId,
+            @RequestParam(value = "resolutionNote", required = false) String resolutionNote) {
+        return ApiResponse.ok(kafkaDemoService.resolveDltIncident(incidentId, resolutionNote));
     }
 
     @GetMapping("/kafka/demo/status")

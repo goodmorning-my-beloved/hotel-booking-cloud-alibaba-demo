@@ -7,8 +7,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -26,7 +24,9 @@ public class KafkaDemoMetrics {
     private final AtomicLong duplicated = new AtomicLong();
     private final AtomicLong failedForRetry = new AtomicLong();
     private final AtomicLong deadLettered = new AtomicLong();
-    private final Set<String> processedMessageIds = ConcurrentHashMap.newKeySet();
+    private final AtomicLong poisonPublished = new AtomicLong();
+    private final AtomicLong transactionsCommitted = new AtomicLong();
+    private final AtomicLong transactionsAborted = new AtomicLong();
     private final List<KafkaDemoConsumedEvent> recentEvents = new ArrayList<>();
 
     public void published() {
@@ -57,8 +57,16 @@ public class KafkaDemoMetrics {
         deadLettered.incrementAndGet();
     }
 
-    public boolean markProcessed(String messageId) {
-        return processedMessageIds.add(messageId);
+    public void poisonPublished() {
+        poisonPublished.incrementAndGet();
+    }
+
+    public void transactionCommitted() {
+        transactionsCommitted.incrementAndGet();
+    }
+
+    public void transactionAborted() {
+        transactionsAborted.incrementAndGet();
     }
 
     public void record(String messageId,
@@ -106,7 +114,9 @@ public class KafkaDemoMetrics {
                 duplicated.get(),
                 failedForRetry.get(),
                 deadLettered.get(),
-                processedMessageIds.stream().sorted().toList(),
+                poisonPublished.get(),
+                transactionsCommitted.get(),
+                transactionsAborted.get(),
                 events);
     }
 
@@ -118,7 +128,9 @@ public class KafkaDemoMetrics {
             long duplicated,
             long failedForRetry,
             long deadLettered,
-            List<String> processedMessageIds,
+            long poisonPublished,
+            long transactionsCommitted,
+            long transactionsAborted,
             List<KafkaDemoConsumedEvent> recentEvents
     ) {
     }

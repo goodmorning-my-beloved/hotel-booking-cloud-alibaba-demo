@@ -57,13 +57,21 @@ hotel:
       dead-letter-retention-ms: 604800000
       acks: all
       idempotence-enabled: true
-      retries: 3
+      # 幂等 producer 的客户端重试由 delivery.timeout.ms 设最终时间边界，避免只重试几次就过早失败。
+      retries: 2147483647
       linger-ms: 5
+      batch-size: 32768
+      compression-type: lz4
+      delivery-timeout-ms: 120000
+      max-in-flight-requests-per-connection: 5
+      # 多实例部署时必须唯一；Docker 容器 HOSTNAME 天然不同，可 fencing 重启前遗留的 zombie producer。
+      transaction-id-prefix: ${KAFKA_TRANSACTION_ID_PREFIX:hotel-kafka-demo-${HOSTNAME:local}-}
       max-poll-records: 10
       auto-offset-reset: earliest
       listener-concurrency: 2
       retry-backoff-ms: 500
-      retry-max-attempts: 2
+      # FixedBackOff 的第二个参数表示“重试次数”，不包含第一次消费；2 表示最多投递 3 次。
+      retry-max-retries: 2
       consumer-groups:
         primary: hotel-kafka-demo-primary
         audit: hotel-kafka-demo-audit

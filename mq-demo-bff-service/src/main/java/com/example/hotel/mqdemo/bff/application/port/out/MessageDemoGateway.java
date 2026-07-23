@@ -34,9 +34,21 @@ public interface MessageDemoGateway {
 
     ApiResponse<Object> publishKafkaConsumerGroupBatch(int count);
 
+    ApiResponse<Object> publishKafkaAsyncBatch(int count);
+
     ApiResponse<Object> publishKafkaDuplicate(String messageId);
 
     ApiResponse<Object> publishKafkaDeadLetter(String messageId, String key);
+
+    ApiResponse<Object> publishKafkaPoison(String key);
+
+    ApiResponse<Object> publishKafkaTransaction(boolean failAfterFirst);
+
+    ApiResponse<Object> pauseKafkaPrimaryConsumer();
+
+    ApiResponse<Object> resumeKafkaPrimaryConsumer();
+
+    ApiResponse<Object> resolveKafkaDltIncident(String incidentId, String resolutionNote);
 
     ApiResponse<Object> kafkaStatus();
 }

@@ -89,6 +89,11 @@ public class FeignMessageDemoGateway implements MessageDemoGateway {
     }
 
     @Override
+    public ApiResponse<Object> publishKafkaAsyncBatch(int count) {
+        return messageServiceClient.publishKafkaAsyncBatch(count);
+    }
+
+    @Override
     public ApiResponse<Object> publishKafkaDuplicate(String messageId) {
         return messageServiceClient.publishKafkaDuplicate(messageId);
     }
@@ -96,6 +101,31 @@ public class FeignMessageDemoGateway implements MessageDemoGateway {
     @Override
     public ApiResponse<Object> publishKafkaDeadLetter(String messageId, String key) {
         return messageServiceClient.publishKafkaDeadLetter(messageId, key);
+    }
+
+    @Override
+    public ApiResponse<Object> publishKafkaPoison(String key) {
+        return messageServiceClient.publishKafkaPoison(key);
+    }
+
+    @Override
+    public ApiResponse<Object> publishKafkaTransaction(boolean failAfterFirst) {
+        return messageServiceClient.publishKafkaTransaction(failAfterFirst);
+    }
+
+    @Override
+    public ApiResponse<Object> pauseKafkaPrimaryConsumer() {
+        return messageServiceClient.pauseKafkaPrimaryConsumer();
+    }
+
+    @Override
+    public ApiResponse<Object> resumeKafkaPrimaryConsumer() {
+        return messageServiceClient.resumeKafkaPrimaryConsumer();
+    }
+
+    @Override
+    public ApiResponse<Object> resolveKafkaDltIncident(String incidentId, String resolutionNote) {
+        return messageServiceClient.resolveKafkaDltIncident(incidentId, resolutionNote);
     }
 
     @Override

@@ -23,3 +23,39 @@ GET http://localhost:8080/api/mq-demo/booking-events/rabbitmq
 
 ### See Kafka consumed events
 GET http://localhost:8080/api/mq-demo/booking-events/kafka
+
+### Kafka normal send and Broker ACK
+POST http://localhost:8080/api/mq-demo/kafka/normal?key=room-101
+
+### Kafka same-key partition ordering
+POST http://localhost:8080/api/mq-demo/kafka/key-order?key=room-101&count=5
+
+### Kafka consumer groups and deterministic partition coverage
+POST http://localhost:8080/api/mq-demo/kafka/group?count=9
+
+### Kafka asynchronous batch, compression and linger
+POST http://localhost:8080/api/mq-demo/kafka/async-batch?count=20
+
+### Kafka database-backed consumer idempotency
+POST http://localhost:8080/api/mq-demo/kafka/duplicate?messageId=KMSG-DEMO-DUP
+
+### Kafka blocking retry and DLT
+POST http://localhost:8080/api/mq-demo/kafka/dead-letter?key=room-102
+
+### Kafka poison JSON and ErrorHandlingDeserializer
+POST http://localhost:8080/api/mq-demo/kafka/poison?key=room-103
+
+### Kafka committed transaction: both records become visible
+POST http://localhost:8080/api/mq-demo/kafka/transaction?failAfterFirst=false
+
+### Kafka aborted transaction: read_committed consumers see neither record
+POST http://localhost:8080/api/mq-demo/kafka/transaction?failAfterFirst=true
+
+### Pause primary group, then publish messages and observe lag
+POST http://localhost:8080/api/mq-demo/kafka/consumer/pause
+
+### Resume primary group and observe lag return to zero
+POST http://localhost:8080/api/mq-demo/kafka/consumer/resume
+
+### Kafka topics, offsets, lag, DLT incidents and persisted idempotency records
+GET http://localhost:8080/api/mq-demo/kafka/status

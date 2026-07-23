@@ -13,13 +13,18 @@ public class KafkaDemoProperties {
     private long deadLetterRetentionMs = 604800000L;
     private String acks = "all";
     private boolean idempotenceEnabled = true;
-    private int retries = 3;
+    private int retries = Integer.MAX_VALUE;
     private int lingerMs = 5;
+    private int batchSize = 32768;
+    private String compressionType = "lz4";
+    private int deliveryTimeoutMs = 120000;
+    private int maxInFlightRequestsPerConnection = 5;
+    private String transactionIdPrefix = "hotel-kafka-demo-local-";
     private int maxPollRecords = 10;
     private String autoOffsetReset = "earliest";
     private int listenerConcurrency = 2;
     private long retryBackoffMs = 500L;
-    private long retryMaxAttempts = 2L;
+    private long retryMaxRetries = 2L;
     private ConsumerGroups consumerGroups = new ConsumerGroups();
 
     public String getTopic() {
@@ -102,6 +107,46 @@ public class KafkaDemoProperties {
         this.lingerMs = lingerMs;
     }
 
+    public int getBatchSize() {
+        return batchSize;
+    }
+
+    public void setBatchSize(int batchSize) {
+        this.batchSize = batchSize;
+    }
+
+    public String getCompressionType() {
+        return compressionType;
+    }
+
+    public void setCompressionType(String compressionType) {
+        this.compressionType = compressionType;
+    }
+
+    public int getDeliveryTimeoutMs() {
+        return deliveryTimeoutMs;
+    }
+
+    public void setDeliveryTimeoutMs(int deliveryTimeoutMs) {
+        this.deliveryTimeoutMs = deliveryTimeoutMs;
+    }
+
+    public int getMaxInFlightRequestsPerConnection() {
+        return maxInFlightRequestsPerConnection;
+    }
+
+    public void setMaxInFlightRequestsPerConnection(int maxInFlightRequestsPerConnection) {
+        this.maxInFlightRequestsPerConnection = maxInFlightRequestsPerConnection;
+    }
+
+    public String getTransactionIdPrefix() {
+        return transactionIdPrefix;
+    }
+
+    public void setTransactionIdPrefix(String transactionIdPrefix) {
+        this.transactionIdPrefix = transactionIdPrefix;
+    }
+
     public int getMaxPollRecords() {
         return maxPollRecords;
     }
@@ -134,12 +179,12 @@ public class KafkaDemoProperties {
         this.retryBackoffMs = retryBackoffMs;
     }
 
-    public long getRetryMaxAttempts() {
-        return retryMaxAttempts;
+    public long getRetryMaxRetries() {
+        return retryMaxRetries;
     }
 
-    public void setRetryMaxAttempts(long retryMaxAttempts) {
-        this.retryMaxAttempts = retryMaxAttempts;
+    public void setRetryMaxRetries(long retryMaxRetries) {
+        this.retryMaxRetries = retryMaxRetries;
     }
 
     public ConsumerGroups getConsumerGroups() {

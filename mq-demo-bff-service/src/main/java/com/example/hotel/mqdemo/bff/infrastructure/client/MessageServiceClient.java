@@ -63,6 +63,9 @@ public interface MessageServiceClient {
     @PostMapping("/messages/kafka/demo/group")
     ApiResponse<Object> publishKafkaConsumerGroupBatch(@RequestParam(value = "count", defaultValue = "9") int count);
 
+    @PostMapping("/messages/kafka/demo/async-batch")
+    ApiResponse<Object> publishKafkaAsyncBatch(@RequestParam(value = "count", defaultValue = "20") int count);
+
     @PostMapping("/messages/kafka/demo/duplicate")
     ApiResponse<Object> publishKafkaDuplicate(@RequestParam(value = "messageId", required = false) String messageId);
 
@@ -70,6 +73,24 @@ public interface MessageServiceClient {
     ApiResponse<Object> publishKafkaDeadLetter(
             @RequestParam(value = "messageId", required = false) String messageId,
             @RequestParam(value = "key", required = false) String key);
+
+    @PostMapping("/messages/kafka/demo/poison")
+    ApiResponse<Object> publishKafkaPoison(@RequestParam(value = "key", required = false) String key);
+
+    @PostMapping("/messages/kafka/demo/transaction")
+    ApiResponse<Object> publishKafkaTransaction(
+            @RequestParam(value = "failAfterFirst", defaultValue = "false") boolean failAfterFirst);
+
+    @PostMapping("/messages/kafka/demo/consumer/pause")
+    ApiResponse<Object> pauseKafkaPrimaryConsumer();
+
+    @PostMapping("/messages/kafka/demo/consumer/resume")
+    ApiResponse<Object> resumeKafkaPrimaryConsumer();
+
+    @PostMapping("/messages/kafka/demo/dlt/incidents/{incidentId}/resolve")
+    ApiResponse<Object> resolveKafkaDltIncident(
+            @org.springframework.web.bind.annotation.PathVariable("incidentId") String incidentId,
+            @RequestParam(value = "resolutionNote", required = false) String resolutionNote);
 
     @GetMapping("/messages/kafka/demo/status")
     ApiResponse<Object> kafkaStatus();

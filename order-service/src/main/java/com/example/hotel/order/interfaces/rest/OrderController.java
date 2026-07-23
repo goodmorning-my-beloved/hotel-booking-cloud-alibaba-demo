@@ -1,12 +1,12 @@
 package com.example.hotel.order.interfaces.rest;
 
 import com.example.hotel.common.api.ApiResponse;
-import com.example.hotel.common.dto.BookingRequest;
-import com.example.hotel.common.dto.BookingResponse;
 import com.example.hotel.order.application.command.BookRoomCommand;
 import com.example.hotel.order.application.port.in.BookRoomUseCase;
 import com.example.hotel.order.application.port.in.OrderQueryUseCase;
 import com.example.hotel.order.application.result.BookingView;
+import com.example.hotel.order.interfaces.rest.dto.BookRoomRequest;
+import com.example.hotel.order.interfaces.rest.dto.BookingResponse;
 import com.alibaba.csp.sentinel.annotation.SentinelResource;
 import com.alibaba.csp.sentinel.slots.block.BlockException;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,13 +32,13 @@ public class OrderController {
 
     @PostMapping("/book")
     @SentinelResource(value = "bookRoom", blockHandler = "bookBlocked")
-    public ApiResponse<BookingResponse> book(@RequestBody BookingRequest request) {
+    public ApiResponse<BookingResponse> book(@RequestBody BookRoomRequest request) {
         BookingView booking = bookRoomUseCase.bookRoom(new BookRoomCommand(
                 request.userId(), request.roomId(), request.checkIn(), request.checkOut()));
         return ApiResponse.ok(toResponse(booking));
     }
 
-    public ApiResponse<BookingResponse> bookBlocked(BookingRequest request, BlockException ex) {
+    public ApiResponse<BookingResponse> bookBlocked(BookRoomRequest request, BlockException ex) {
         return ApiResponse.fail("Booking is temporarily throttled, please retry later.");
     }
 

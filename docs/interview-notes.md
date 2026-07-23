@@ -69,7 +69,7 @@ Feign 的核心价值是把 HTTP 调用写成 Java 接口，并结合服务发�
 
 ## RabbitMQ
 
-订单创建后，`order-service` 通过 `StreamBridge` 把 `BookingCreatedEvent` 发送到 RabbitMQ 的 `hotel.booking.created` exchange，`message-service` 用 Spring Cloud Stream Consumer 消费。
+订单创建后，`order-service` 的消息适配器通过 `StreamBridge` 把 `BookingCreatedMessage` 发送到 RabbitMQ 的 `hotel.booking.created` exchange。
 
 常见追问：
 

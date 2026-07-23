@@ -1,8 +1,8 @@
 package com.example.hotel.order.infrastructure.client;
 
 import com.example.hotel.common.api.ApiResponse;
-import com.example.hotel.common.dto.ReserveRoomRequest;
-import com.example.hotel.common.dto.RoomDto;
+import com.example.hotel.order.infrastructure.client.dto.ReserveRoomApiRequest;
+import com.example.hotel.order.infrastructure.client.dto.RoomApiResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,12 +14,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 public interface HotelClient {
 
     @GetMapping("/rooms/{roomId}")
-    ApiResponse<RoomDto> findRoom(@PathVariable("roomId") Long roomId);
+    ApiResponse<RoomApiResponse> findRoom(@PathVariable("roomId") Long roomId);
 
     @PostMapping("/rooms/{roomId}/reserve")
-    ApiResponse<RoomDto> reserve(@PathVariable("roomId") Long roomId, @RequestBody ReserveRoomRequest request);
+    ApiResponse<RoomApiResponse> reserve(@PathVariable("roomId") Long roomId,
+                                         @RequestBody ReserveRoomApiRequest request);
 
     @PostMapping("/rooms/{roomId}/release")
-    ApiResponse<RoomDto> release(@PathVariable("roomId") Long roomId,
-                                 @RequestParam("orderId") String orderId);
+    ApiResponse<RoomApiResponse> release(@PathVariable("roomId") Long roomId,
+                                         @RequestParam("orderId") String orderId);
 }

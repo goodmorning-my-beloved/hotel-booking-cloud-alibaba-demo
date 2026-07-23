@@ -1,8 +1,8 @@
 package com.example.hotel.order.infrastructure.client;
 
-import com.example.hotel.common.dto.PaymentRequest;
-import com.example.hotel.common.dto.PaymentResponse;
 import com.example.hotel.order.application.port.out.PaymentGateway;
+import com.example.hotel.order.infrastructure.client.dto.PaymentApiRequest;
+import com.example.hotel.order.infrastructure.client.dto.PaymentApiResponse;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -18,8 +18,8 @@ public class FeignPaymentGateway implements PaymentGateway {
 
     @Override
     public PaymentReceipt pay(String orderId, Long userId, BigDecimal amount) {
-        PaymentResponse response = RemoteResponse.requireData(
-                paymentClient.pay(new PaymentRequest(orderId, userId, amount)), "Payment failed");
+        PaymentApiResponse response = RemoteResponse.requireData(
+                paymentClient.pay(new PaymentApiRequest(orderId, userId, amount)), "Payment failed");
         return new PaymentReceipt(response.paymentId(), response.status());
     }
 

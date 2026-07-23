@@ -161,4 +161,34 @@ public class MqDemoController {
     public ApiResponse<Object> kafkaStatus() {
         return facadeService.kafkaStatus();
     }
+
+    @PostMapping("/jvm-gc/allocate-young")
+    public ApiResponse<Object> allocateYoungObjects(
+            @RequestParam(value = "objects", defaultValue = "2000") int objects,
+            @RequestParam(value = "sizeKb", defaultValue = "32") int sizeKb) {
+        return facadeService.allocateYoungObjects(objects, sizeKb);
+    }
+
+    @PostMapping("/jvm-gc/retain-humongous")
+    public ApiResponse<Object> retainHumongousObjects(
+            @RequestParam(value = "objects", defaultValue = "8") int objects,
+            @RequestParam(value = "sizeMb", defaultValue = "2") int sizeMb) {
+        return facadeService.retainHumongousObjects(objects, sizeMb);
+    }
+
+    @PostMapping("/jvm-gc/explicit-gc")
+    public ApiResponse<Object> explicitGc(
+            @RequestParam(value = "times", defaultValue = "1") int times) {
+        return facadeService.explicitGc(times);
+    }
+
+    @PostMapping("/jvm-gc/clear")
+    public ApiResponse<Object> clearJvmGcDemoObjects() {
+        return facadeService.clearJvmGcDemoObjects();
+    }
+
+    @GetMapping("/jvm-gc/status")
+    public ApiResponse<Object> jvmGcDemoStatus() {
+        return facadeService.jvmGcDemoStatus();
+    }
 }

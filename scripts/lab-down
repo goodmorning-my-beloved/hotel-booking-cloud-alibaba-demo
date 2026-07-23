@@ -9,6 +9,6 @@ if [[ -f /tmp/hotel-demo-sentinel-proxy.pid ]]; then
   rm -f /tmp/hotel-demo-sentinel-proxy.pid /tmp/hotel-demo-sentinel-proxy.log
 fi
 
-docker compose --profile full --profile sentinel-chain down --remove-orphans
+docker compose --profile full --profile sentinel-chain --profile jvm-gc down --remove-orphans
 
 echo "All lab containers are stopped."

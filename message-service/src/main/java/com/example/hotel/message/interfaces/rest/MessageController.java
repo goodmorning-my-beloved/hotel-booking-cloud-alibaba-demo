@@ -2,7 +2,10 @@ package com.example.hotel.message.interfaces.rest;
 
 import com.example.hotel.common.api.ApiResponse;
 import com.example.hotel.message.application.service.BookingEventApplicationService;
+import com.example.hotel.message.application.service.JvmGcDemoApplicationService;
 import com.example.hotel.message.application.service.KafkaDemoApplicationService;
+import com.example.hotel.message.application.result.JvmGcDemoActionResult;
+import com.example.hotel.message.application.result.JvmGcDemoStatus;
 import com.example.hotel.message.application.result.KafkaDemoPublishResult;
 import com.example.hotel.message.application.result.KafkaDemoStatus;
 import com.example.hotel.message.application.result.KafkaDemoTransactionResult;
@@ -28,13 +31,16 @@ public class MessageController {
     private final RabbitMqDemoApplicationService rabbitMqDemoService;
     private final BookingEventApplicationService bookingEventService;
     private final KafkaDemoApplicationService kafkaDemoService;
+    private final JvmGcDemoApplicationService jvmGcDemoService;
 
     public MessageController(RabbitMqDemoApplicationService rabbitMqDemoService,
                              BookingEventApplicationService bookingEventService,
-                             KafkaDemoApplicationService kafkaDemoService) {
+                             KafkaDemoApplicationService kafkaDemoService,
+                             JvmGcDemoApplicationService jvmGcDemoService) {
         this.rabbitMqDemoService = rabbitMqDemoService;
         this.bookingEventService = bookingEventService;
         this.kafkaDemoService = kafkaDemoService;
+        this.jvmGcDemoService = jvmGcDemoService;
     }
 
     @GetMapping("/booking-events")
@@ -198,5 +204,38 @@ public class MessageController {
     public ApiResponse<KafkaDemoStatus> kafkaDemoStatus() {
         // 状态接口展示 topic、partition、offset、consumer group lag、重复消息和 DLT 处理结果。
         return ApiResponse.ok(kafkaDemoService.status());
+    }
+
+    @PostMapping("/jvm-gc/demo/allocate-young")
+    public ApiResponse<JvmGcDemoActionResult> allocateYoungObjects(
+            @RequestParam(value = "objects", defaultValue = "2000") int objects,
+            @RequestParam(value = "sizeKb", defaultValue = "32") int sizeKb) {
+        // 短命对象分配：观察 G1 Young GC、Eden 波动和 allocation rate。
+        return ApiResponse.ok(jvmGcDemoService.allocateYoungObjects(objects, sizeKb));
+    }
+
+    @PostMapping("/jvm-gc/demo/retain-humongous")
+    public ApiResponse<JvmGcDemoActionResult> retainHumongousObjects(
+            @RequestParam(value = "objects", defaultValue = "8") int objects,
+            @RequestParam(value = "sizeMb", defaultValue = "2") int sizeMb) {
+        // 大对象保留：在小堆 G1 下观察 humongous/old 区压力和 Full GC 风险。
+        return ApiResponse.ok(jvmGcDemoService.retainHumongousObjects(objects, sizeMb));
+    }
+
+    @PostMapping("/jvm-gc/demo/explicit-gc")
+    public ApiResponse<JvmGcDemoActionResult> explicitGc(
+            @RequestParam(value = "times", defaultValue = "1") int times) {
+        // 显式 GC 演示：用于识别 System.gc()、jcmd GC.run 等人为 Full GC。
+        return ApiResponse.ok(jvmGcDemoService.explicitGc(times));
+    }
+
+    @PostMapping("/jvm-gc/demo/clear")
+    public ApiResponse<JvmGcDemoActionResult> clearJvmGcDemoObjects() {
+        return ApiResponse.ok(jvmGcDemoService.clearRetainedObjects());
+    }
+
+    @GetMapping("/jvm-gc/demo/status")
+    public ApiResponse<JvmGcDemoStatus> jvmGcDemoStatus() {
+        return ApiResponse.ok(jvmGcDemoService.status());
     }
 }

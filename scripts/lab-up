@@ -14,6 +14,7 @@ Labs:
   gateway   Gateway + Nacos + user-service mock backend
   rabbitmq  Gateway + MQ demo BFF + message-service + RabbitMQ
   kafka     Gateway + MQ demo BFF + message-service + Kafka, without Kafka UI
+  jvm-gc    Gateway + MQ demo BFF + message-service + RabbitMQ + Kafka + Prometheus + Grafana G1 GC demo
   sentinel  Sentinel Dashboard + user-service limit demo
   sentinel-chain  Gateway -> BFF -> A -> B Sentinel and Feign demo
   seata     Seata learning skeleton, downgraded for 4GB machines
@@ -26,7 +27,7 @@ if [[ -z "$LAB" || "$LAB" == "-h" || "$LAB" == "--help" ]]; then
   exit 0
 fi
 
-if [[ ! "$LAB" =~ ^(nacos|gateway|rabbitmq|kafka|sentinel|sentinel-chain|seata|full)$ ]]; then
+if [[ ! "$LAB" =~ ^(nacos|gateway|rabbitmq|kafka|jvm-gc|sentinel|sentinel-chain|seata|full)$ ]]; then
   echo "Unknown lab: $LAB" >&2
   usage
   exit 1
@@ -59,7 +60,7 @@ stop_old_lab() {
     kill "$(cat /tmp/hotel-demo-sentinel-proxy.pid)" >/dev/null 2>&1 || true
     rm -f /tmp/hotel-demo-sentinel-proxy.pid /tmp/hotel-demo-sentinel-proxy.log
   fi
-  docker compose --profile full --profile sentinel-chain down --remove-orphans
+  docker compose --profile full --profile sentinel-chain --profile jvm-gc down --remove-orphans
 }
 
 wait_http() {
@@ -209,6 +210,38 @@ Stop:
   ./scripts/lab-down
 EOF
       ;;
+    jvm-gc)
+      cat <<'EOF'
+
+JVM G1 GC lab is up.
+Learn: how to connect JVM metrics to Grafana and locate frequent G1 Full GC causes.
+
+Open:
+  Gateway:    http://127.0.0.1:8080
+  Nacos:      http://127.0.0.1:8848/nacos
+  Grafana:    http://127.0.0.1:3000  admin/admin
+  Prometheus: http://127.0.0.1:9091
+
+Verify and generate pressure:
+  curl -s http://127.0.0.1:8080/api/mq-demo/jvm-gc/status
+  curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/jvm-gc/allocate-young?objects=2000&sizeKb=32'
+  curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/jvm-gc/retain-humongous?objects=8&sizeMb=2'
+  curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/jvm-gc/explicit-gc?times=1'
+  curl -s -XPOST http://127.0.0.1:8080/api/mq-demo/jvm-gc/clear
+
+GC log:
+  docker exec hotel-demo-message sh -c 'tail -n 80 /tmp/message-service-g1-gc.log'
+
+Grafana dashboard:
+  Hotel Demo / Hotel Demo G1 Full GC Troubleshooting
+
+Manual:
+  docs/g1-full-gc-troubleshooting-guide.md
+
+Stop:
+  ./scripts/lab-down
+EOF
+      ;;
     sentinel)
       cat <<'EOF'
 
@@ -348,6 +381,23 @@ case "$LAB" in
     wait_healthy "hotel-demo-rabbitmq" 60
     wait_healthy "hotel-demo-kafka" 90
     docker compose --profile kafka up -d --build gateway-service message-service mq-demo-bff-service
+    wait_http "message-service" "http://127.0.0.1:8085/actuator/health" 90
+    wait_http "mq-demo-bff-service" "http://127.0.0.1:8089/actuator/health" 90
+    wait_http "gateway-service" "http://127.0.0.1:8080/actuator/health" 90
+    ;;
+  jvm-gc)
+    build_modules "gateway-service,mq-demo-bff-service,message-service"
+    stop_old_lab
+    export MESSAGE_SERVICE_JAVA_TOOL_OPTIONS="${MESSAGE_SERVICE_JAVA_TOOL_OPTIONS:--XX:+UseG1GC -Xms192m -Xmx192m -XX:MaxGCPauseMillis=100 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xlog:gc*,safepoint:file=/tmp/message-service-g1-gc.log:time,uptime,level,tags:filecount=5,filesize=10M}"
+    export HOTEL_JVM_GC_DEMO_MAX_RETAINED_BYTES="${HOTEL_JVM_GC_DEMO_MAX_RETAINED_BYTES:-134217728}"
+    docker compose --profile jvm-gc up -d nacos rabbitmq kafka prometheus grafana
+    wait_http "Nacos" "http://127.0.0.1:8848/nacos/v1/console/health/readiness" 60
+    "$PWD/scripts/publish-app-configs-to-nacos.sh"
+    wait_healthy "hotel-demo-rabbitmq" 60
+    wait_healthy "hotel-demo-kafka" 90
+    wait_http "Prometheus" "http://127.0.0.1:9091/-/ready" 30
+    wait_http "Grafana" "http://127.0.0.1:3000/api/health" 60
+    docker compose --profile jvm-gc up -d --build gateway-service message-service mq-demo-bff-service
     wait_http "message-service" "http://127.0.0.1:8085/actuator/health" 90
     wait_http "mq-demo-bff-service" "http://127.0.0.1:8089/actuator/health" 90
     wait_http "gateway-service" "http://127.0.0.1:8080/actuator/health" 90

@@ -4,7 +4,7 @@
 
 保留原有酒店业务代码，方便以后回看 Gateway、Nacos、RabbitMQ、Kafka、Sentinel、Seata 在完整链路里的组合方式。但日常学习请优先使用下面的新入口。
 
-酒店主链路已按轻量 DDD + 端口适配器结构组织，并带有领域、用例和架构测试。新增接口、领域规则、Feign/MQ/DB 实现时，先看 [docs/ddd-development-guide.md](docs/ddd-development-guide.md)。学习 Kafka 时看 [docs/kafka-quick-start-guide.md](docs/kafka-quick-start-guide.md)。
+酒店主链路已按轻量 DDD + 端口适配器结构组织，并带有领域、用例和架构测试。新增接口、领域规则、Feign/MQ/DB 实现时，先看 [docs/ddd-development-guide.md](docs/ddd-development-guide.md)。学习 Kafka 时看 [docs/kafka-quick-start-guide.md](docs/kafka-quick-start-guide.md)。排查 G1 频繁 Full GC 时看 [docs/g1-full-gc-troubleshooting-guide.md](docs/g1-full-gc-troubleshooting-guide.md)。
 
 ## 新入口
 
@@ -15,6 +15,7 @@ cd /opt/codex-runner/workspace/hotel-booking-sca-demo
 ./scripts/lab-up gateway
 ./scripts/lab-up rabbitmq
 ./scripts/lab-up kafka
+./scripts/lab-up jvm-gc
 ./scripts/lab-up sentinel
 ./scripts/lab-up sentinel-chain
 ./scripts/lab-up seata
@@ -33,6 +34,7 @@ cd /opt/codex-runner/workspace/hotel-booking-sca-demo
 | `gateway` | Nacos + gateway-service + user-service | 路由、`StripPrefix`、`lb://` 负载均衡路由 | 中 |
 | `rabbitmq` | Nacos + RabbitMQ + gateway-service + mq-demo-bff-service + message-service | queue、exchange、routing key、发布与消费 | 中 |
 | `kafka` | Nacos + RabbitMQ + Kafka + gateway-service + mq-demo-bff-service + message-service | topic、partition、producer ACK、consumer group、offset、lag、DLT | 中偏高 |
+| `jvm-gc` | Nacos + RabbitMQ + Kafka + gateway-service + mq-demo-bff-service + message-service + Prometheus + Grafana | JVM 指标接入、G1 Full GC 现象和根因排查 | 中偏高 |
 | `sentinel` | Nacos + Sentinel Dashboard + user-service | 资源名、限流规则、blockHandler | 中 |
 | `sentinel-chain` | Nacos + Sentinel Dashboard + Prometheus + Grafana + Gateway + BFF + A + B | Sentinel 集群流控、Prometheus 指标采集、Grafana JVM/线程面板 | 中偏高 |
 | `seata` | Nacos + Seata Server + hotel-service + payment-service | Seata 控制台、客户端配置、事务组映射 | 中偏高 |

@@ -4,12 +4,12 @@ x-app-env: &app-env
   NACOS_ADDR: nacos:8848
   NACOS_NAMESPACE: pro
   SENTINEL_DASHBOARD: sentinel-dashboard:8858
-  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
   # Java 服务通过 5672 连接 RabbitMQ；Web 控制台使用 15672。
-  RABBITMQ_PORT: 5672
-  RABBITMQ_USERNAME: guest
-  RABBITMQ_PASSWORD: guest
-  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+  RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+  KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
   SEATA_ADDR: seata-server:8091
   SEATA_ENABLED: "true"
 
@@ -17,7 +17,7 @@ services:
   nacos:
     image: nacos/nacos-server:v2.3.2
     container_name: hotel-demo-nacos
-    profiles: ["nacos", "gateway", "rabbitmq", "kafka", "sentinel", "sentinel-chain", "seata", "full"]
+    profiles: ["nacos", "gateway", "rabbitmq", "kafka", "jvm-gc", "sentinel", "sentinel-chain", "seata", "full"]
     environment:
       MODE: standalone
       NACOS_AUTH_ENABLE: "false"
@@ -53,7 +53,7 @@ services:
   prometheus:
     image: prom/prometheus:v2.54.1
     container_name: hotel-demo-prometheus
-    profiles: ["sentinel-chain"]
+    profiles: ["jvm-gc", "sentinel-chain"]
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=2h
@@ -68,7 +68,7 @@ services:
   grafana:
     image: grafana/grafana-oss:11.2.2
     container_name: hotel-demo-grafana
-    profiles: ["sentinel-chain"]
+    profiles: ["jvm-gc", "sentinel-chain"]
     depends_on:
       - prometheus
     environment:
@@ -90,7 +90,7 @@ services:
     # management 镜像自带 RabbitMQ Broker 和 Web 控制台，适合教学演示。
     image: rabbitmq:3.13-management
     container_name: hotel-demo-rabbitmq
-    profiles: ["rabbitmq", "kafka", "full"]
+    profiles: ["rabbitmq", "kafka", "jvm-gc", "full"]
     environment:
       # demo 环境用 guest/guest，生产环境不要使用默认账号密码。
       RABBITMQ_DEFAULT_USER: guest
@@ -113,7 +113,7 @@ services:
   kafka:
     image: apache/kafka:3.7.0
     container_name: hotel-demo-kafka
-    profiles: ["kafka", "full"]
+    profiles: ["kafka", "jvm-gc", "full"]
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -176,7 +176,7 @@ services:
       args:
         MODULE: gateway-service
     container_name: hotel-demo-gateway
-    profiles: ["nacos", "gateway", "rabbitmq", "kafka", "sentinel-chain", "full"]
+    profiles: ["nacos", "gateway", "rabbitmq", "kafka", "jvm-gc", "sentinel-chain", "full"]
     depends_on:
       - nacos
     environment:
@@ -193,7 +193,7 @@ services:
       args:
         MODULE: mq-demo-bff-service
     container_name: hotel-demo-mq-demo-bff
-    profiles: ["rabbitmq", "kafka", "full"]
+    profiles: ["rabbitmq", "kafka", "jvm-gc", "full"]
     depends_on:
       - nacos
       - message-service
@@ -399,17 +399,20 @@ services:
       args:
         MODULE: message-service
     container_name: hotel-demo-message
-    profiles: ["rabbitmq", "kafka", "full"]
+    profiles: ["rabbitmq", "kafka", "jvm-gc", "full"]
     depends_on:
       nacos:
         condition: service_started
       rabbitmq:
         condition: service_healthy
+        required: false
       kafka:
         condition: service_healthy
         required: false
     environment:
       <<: *app-env
+      JAVA_TOOL_OPTIONS: ${MESSAGE_SERVICE_JAVA_TOOL_OPTIONS:-}
+      HOTEL_JVM_GC_DEMO_MAX_RETAINED_BYTES: ${HOTEL_JVM_GC_DEMO_MAX_RETAINED_BYTES:-134217728}
     volumes:
       # 保存 RabbitMQ outbox、Kafka 消费幂等记录和 DLT 工单；compose down 不会删除该 volume。
       - message-service-data:/app/data

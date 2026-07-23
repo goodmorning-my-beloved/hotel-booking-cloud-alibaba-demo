@@ -132,4 +132,29 @@ public class FeignMessageDemoGateway implements MessageDemoGateway {
     public ApiResponse<Object> kafkaStatus() {
         return messageServiceClient.kafkaStatus();
     }
+
+    @Override
+    public ApiResponse<Object> allocateYoungObjects(int objects, int sizeKb) {
+        return messageServiceClient.allocateYoungObjects(objects, sizeKb);
+    }
+
+    @Override
+    public ApiResponse<Object> retainHumongousObjects(int objects, int sizeMb) {
+        return messageServiceClient.retainHumongousObjects(objects, sizeMb);
+    }
+
+    @Override
+    public ApiResponse<Object> explicitGc(int times) {
+        return messageServiceClient.explicitGc(times);
+    }
+
+    @Override
+    public ApiResponse<Object> clearJvmGcDemoObjects() {
+        return messageServiceClient.clearJvmGcDemoObjects();
+    }
+
+    @Override
+    public ApiResponse<Object> jvmGcDemoStatus() {
+        return messageServiceClient.jvmGcDemoStatus();
+    }
 }

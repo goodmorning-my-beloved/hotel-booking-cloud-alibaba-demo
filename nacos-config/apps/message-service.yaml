@@ -47,6 +47,8 @@ spring:
         default-requeue-rejected: false
 
 hotel:
+  jvm-gc-demo:
+    max-retained-bytes: ${HOTEL_JVM_GC_DEMO_MAX_RETAINED_BYTES:134217728}
   kafka:
     demo:
       topic: hotel.kafka.demo.orders
@@ -92,3 +94,12 @@ hotel:
       fanout-exchange: hotel.booking.fanout.exchange
       fanout-sms-queue: hotel.booking.fanout.sms.queue
       fanout-points-queue: hotel.booking.fanout.points.queue
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  metrics:
+    tags:
+      application: ${spring.application.name}

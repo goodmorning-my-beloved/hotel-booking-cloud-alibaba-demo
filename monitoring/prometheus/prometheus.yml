@@ -30,3 +30,19 @@ scrape_configs:
           - sentinel-b-service:8088
         labels:
           instance: sentinel-b-service
+
+  - job_name: hotel-demo-jvm-gc
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - gateway-service:8080
+        labels:
+          instance: gateway-service
+      - targets:
+          - mq-demo-bff-service:8089
+        labels:
+          instance: mq-demo-bff-service
+      - targets:
+          - message-service:8085
+        labels:
+          instance: message-service

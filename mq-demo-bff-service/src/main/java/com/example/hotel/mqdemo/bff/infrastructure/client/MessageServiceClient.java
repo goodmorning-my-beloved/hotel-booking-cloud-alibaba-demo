@@ -94,4 +94,23 @@ public interface MessageServiceClient {
 
     @GetMapping("/messages/kafka/demo/status")
     ApiResponse<Object> kafkaStatus();
+
+    @PostMapping("/messages/jvm-gc/demo/allocate-young")
+    ApiResponse<Object> allocateYoungObjects(
+            @RequestParam(value = "objects", defaultValue = "2000") int objects,
+            @RequestParam(value = "sizeKb", defaultValue = "32") int sizeKb);
+
+    @PostMapping("/messages/jvm-gc/demo/retain-humongous")
+    ApiResponse<Object> retainHumongousObjects(
+            @RequestParam(value = "objects", defaultValue = "8") int objects,
+            @RequestParam(value = "sizeMb", defaultValue = "2") int sizeMb);
+
+    @PostMapping("/messages/jvm-gc/demo/explicit-gc")
+    ApiResponse<Object> explicitGc(@RequestParam(value = "times", defaultValue = "1") int times);
+
+    @PostMapping("/messages/jvm-gc/demo/clear")
+    ApiResponse<Object> clearJvmGcDemoObjects();
+
+    @GetMapping("/messages/jvm-gc/demo/status")
+    ApiResponse<Object> jvmGcDemoStatus();
 }

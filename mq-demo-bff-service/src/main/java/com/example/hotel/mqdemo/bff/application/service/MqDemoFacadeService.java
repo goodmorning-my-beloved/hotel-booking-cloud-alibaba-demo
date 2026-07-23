@@ -108,4 +108,24 @@ public class MqDemoFacadeService {
     public ApiResponse<Object> kafkaStatus() {
         return messageDemoGateway.kafkaStatus();
     }
+
+    public ApiResponse<Object> allocateYoungObjects(int objects, int sizeKb) {
+        return messageDemoGateway.allocateYoungObjects(objects, sizeKb);
+    }
+
+    public ApiResponse<Object> retainHumongousObjects(int objects, int sizeMb) {
+        return messageDemoGateway.retainHumongousObjects(objects, sizeMb);
+    }
+
+    public ApiResponse<Object> explicitGc(int times) {
+        return messageDemoGateway.explicitGc(times);
+    }
+
+    public ApiResponse<Object> clearJvmGcDemoObjects() {
+        return messageDemoGateway.clearJvmGcDemoObjects();
+    }
+
+    public ApiResponse<Object> jvmGcDemoStatus() {
+        return messageDemoGateway.jvmGcDemoStatus();
+    }
 }

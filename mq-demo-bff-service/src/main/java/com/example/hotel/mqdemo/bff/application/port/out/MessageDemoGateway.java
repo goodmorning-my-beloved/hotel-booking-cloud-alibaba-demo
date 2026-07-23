@@ -51,4 +51,14 @@ public interface MessageDemoGateway {
     ApiResponse<Object> resolveKafkaDltIncident(String incidentId, String resolutionNote);
 
     ApiResponse<Object> kafkaStatus();
+
+    ApiResponse<Object> allocateYoungObjects(int objects, int sizeKb);
+
+    ApiResponse<Object> retainHumongousObjects(int objects, int sizeMb);
+
+    ApiResponse<Object> explicitGc(int times);
+
+    ApiResponse<Object> clearJvmGcDemoObjects();
+
+    ApiResponse<Object> jvmGcDemoStatus();
 }

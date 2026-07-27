@@ -10,6 +10,13 @@ x-app-env: &app-env
   RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
   RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
   KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+  MYSQL_HOST: ${MYSQL_HOST:-mysql}
+  MYSQL_PORT: ${MYSQL_PORT:-3306}
+  MYSQL_DATABASE: ${MYSQL_DATABASE:-hotel_demo}
+  MYSQL_USERNAME: ${MYSQL_USERNAME:-hotel_demo}
+  MYSQL_PASSWORD: ${MYSQL_PASSWORD:-hotel_demo_pass}
+  MYSQL_MAX_POOL_SIZE: ${MYSQL_MAX_POOL_SIZE:-6}
+  MYSQL_MIN_IDLE: ${MYSQL_MIN_IDLE:-1}
   SEATA_ADDR: seata-server:8091
   SEATA_ENABLED: "true"
 
@@ -152,6 +159,35 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
     ports:
       - "8090:8080"
+    networks:
+      - hotel-demo
+
+  mysql:
+    image: mysql:8.0
+    container_name: hotel-demo-mysql
+    profiles: ["nacos", "gateway", "rabbitmq", "kafka", "jvm-gc", "sentinel", "seata", "full"]
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --innodb-buffer-pool-size=96M
+      - --max-connections=50
+      - --performance-schema=OFF
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-hotel_demo_root_pass}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-hotel_demo}
+      MYSQL_USER: ${MYSQL_USERNAME:-hotel_demo}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-hotel_demo_pass}
+      TZ: UTC
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
     networks:
       - hotel-demo
 
@@ -323,7 +359,10 @@ services:
     container_name: hotel-demo-user
     profiles: ["nacos", "gateway", "sentinel", "full"]
     depends_on:
-      - nacos
+      nacos:
+        condition: service_started
+      mysql:
+        condition: service_healthy
     environment:
       <<: *app-env
     ports:
@@ -340,8 +379,12 @@ services:
     container_name: hotel-demo-hotel
     profiles: ["seata", "full"]
     depends_on:
-      - nacos
-      - seata-server
+      nacos:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+      seata-server:
+        condition: service_started
     environment:
       <<: *app-env
     ports:
@@ -365,6 +408,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      mysql:
+        condition: service_healthy
       seata-server:
         condition: service_started
     environment:
@@ -383,8 +428,12 @@ services:
     container_name: hotel-demo-payment
     profiles: ["seata", "full"]
     depends_on:
-      - nacos
-      - seata-server
+      nacos:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+      seata-server:
+        condition: service_started
     environment:
       <<: *app-env
     ports:
@@ -409,12 +458,14 @@ services:
       kafka:
         condition: service_healthy
         required: false
+      mysql:
+        condition: service_healthy
     environment:
       <<: *app-env
       JAVA_TOOL_OPTIONS: ${MESSAGE_SERVICE_JAVA_TOOL_OPTIONS:-}
       HOTEL_JVM_GC_DEMO_MAX_RETAINED_BYTES: ${HOTEL_JVM_GC_DEMO_MAX_RETAINED_BYTES:-134217728}
     volumes:
-      # 保存 RabbitMQ outbox、Kafka 消费幂等记录和 DLT 工单；compose down 不会删除该 volume。
+      # 历史 H2 数据 volume 保留但不再作为 MySQL 演示的数据源。
       - message-service-data:/app/data
     ports:
       - "8085:8085"
@@ -426,4 +477,5 @@ networks:
     driver: bridge
 
 volumes:
+  mysql-data:
   message-service-data:

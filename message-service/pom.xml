@@ -61,8 +61,13 @@
         </dependency>
         <dependency>
             <groupId>com.h2database</groupId>
-            <!-- demo 使用嵌入式 H2，避免学习 RabbitMQ 时还必须额外准备 MySQL；生产环境应换成业务库。 -->
+            <!-- 测试保留 H2；运行环境通过 Nacos 配置连接 MySQL。 -->
             <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
         <dependency>

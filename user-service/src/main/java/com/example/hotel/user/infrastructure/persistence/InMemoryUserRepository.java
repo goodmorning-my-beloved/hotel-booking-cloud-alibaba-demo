@@ -3,12 +3,10 @@ package com.example.hotel.user.infrastructure.persistence;
 import com.example.hotel.user.domain.model.HotelUser;
 import com.example.hotel.user.domain.model.MembershipLevel;
 import com.example.hotel.user.domain.repository.UserRepository;
-import org.springframework.stereotype.Repository;
 
 import java.util.Map;
 import java.util.Optional;
 
-@Repository
 public class InMemoryUserRepository implements UserRepository {
 
     private final Map<Long, HotelUser> users = Map.of(

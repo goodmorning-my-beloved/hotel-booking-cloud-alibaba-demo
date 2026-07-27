@@ -46,8 +46,17 @@ public final class Room {
         reservations.remove(orderId);
     }
 
+    public synchronized void restoreReservation(String orderId, StayPeriod stayPeriod) {
+        requireOrderId(orderId);
+        reservations.put(orderId, stayPeriod);
+    }
+
     public synchronized int available() {
         return capacity - reservations.size();
+    }
+
+    public synchronized Map<String, StayPeriod> reservations() {
+        return Map.copyOf(reservations);
     }
 
     public Long id() {
@@ -64,6 +73,10 @@ public final class Room {
 
     public BigDecimal pricePerNight() {
         return pricePerNight;
+    }
+
+    public int capacity() {
+        return capacity;
     }
 
     private void requireOrderId(String orderId) {

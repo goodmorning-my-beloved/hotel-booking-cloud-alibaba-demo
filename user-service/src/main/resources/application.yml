@@ -4,6 +4,22 @@ server:
 spring:
   application:
     name: user-service
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:hotel_demo}?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&rewriteBatchedStatements=true
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${MYSQL_USERNAME:hotel_demo}
+    password: ${MYSQL_PASSWORD:hotel_demo_pass}
+    hikari:
+      pool-name: ${spring.application.name}-hikari
+      maximum-pool-size: ${MYSQL_MAX_POOL_SIZE:6}
+      minimum-idle: ${MYSQL_MIN_IDLE:1}
+      connection-timeout: 3000
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  sql:
+    init:
+      mode: always
   config:
     import: optional:nacos:${spring.application.name}.yaml
   cloud:
@@ -24,4 +40,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus,metrics
+  metrics:
+    tags:
+      application: ${spring.application.name}

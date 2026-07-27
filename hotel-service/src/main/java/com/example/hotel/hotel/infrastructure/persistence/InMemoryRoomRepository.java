@@ -2,7 +2,6 @@ package com.example.hotel.hotel.infrastructure.persistence;
 
 import com.example.hotel.hotel.domain.model.Room;
 import com.example.hotel.hotel.domain.repository.RoomRepository;
-import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.util.Comparator;
@@ -11,7 +10,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Repository
 public class InMemoryRoomRepository implements RoomRepository {
 
     private final Map<Long, Room> rooms = new ConcurrentHashMap<>(Map.of(

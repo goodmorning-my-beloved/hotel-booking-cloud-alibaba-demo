@@ -14,7 +14,7 @@ Labs:
   gateway   Gateway + Nacos + user-service mock backend
   rabbitmq  Gateway + MQ demo BFF + message-service + RabbitMQ
   kafka     Gateway + MQ demo BFF + message-service + Kafka, without Kafka UI
-  jvm-gc    Gateway + MQ demo BFF + message-service + RabbitMQ + Kafka + Prometheus + Grafana G1 GC demo
+  jvm-gc    Gateway + MQ demo BFF + message-service + RabbitMQ + Kafka + MySQL + Prometheus + Grafana G1 GC demo
   sentinel  Sentinel Dashboard + user-service limit demo
   sentinel-chain  Gateway -> BFF -> A -> B Sentinel and Feign demo
   seata     Seata learning skeleton, downgraded for 4GB machines
@@ -147,6 +147,7 @@ Open:
   RabbitMQ: http://127.0.0.1:15672  guest/guest
   Gateway:  http://127.0.0.1:8080
   Nacos:    http://127.0.0.1:8848/nacos
+  MySQL:    127.0.0.1:3306  hotel_demo/hotel_demo_pass
 
 Verify:
   curl -s -XPOST http://127.0.0.1:8080/api/mq-demo/rabbitmq/normal
@@ -181,11 +182,12 @@ EOF
 
 Kafka lab is up. Kafka UI is intentionally not started.
 Learn: topic, partition, producer ack, ordering, groups, offset/lag, database idempotency,
-async batch/compression, retry/DLT, poison payloads, and Kafka transactions.
+async batch/compression, retry/DLT, poison payloads, Kafka transactions, and MySQL-backed idempotency tables.
 
 Open:
   Gateway: http://127.0.0.1:8080
   Nacos:   http://127.0.0.1:8848/nacos
+  MySQL:   127.0.0.1:3306  hotel_demo/hotel_demo_pass
 
 Verify:
   curl -s -XPOST 'http://127.0.0.1:8080/api/mq-demo/kafka/normal?key=room-101'
@@ -221,6 +223,7 @@ Open:
   Nacos:      http://127.0.0.1:8848/nacos
   Grafana:    http://127.0.0.1:3000  admin/admin
   Prometheus: http://127.0.0.1:9091
+  MySQL:      127.0.0.1:3306  hotel_demo/hotel_demo_pass
 
 Verify and generate pressure:
   curl -s http://127.0.0.1:8080/api/mq-demo/jvm-gc/status
@@ -234,9 +237,11 @@ GC log:
 
 Grafana dashboard:
   Hotel Demo / Hotel Demo G1 Full GC Troubleshooting
+  Hotel Demo / Hotel Demo MySQL and Connection Pool Metrics
 
 Manual:
   docs/g1-full-gc-troubleshooting-guide.md
+  docs/mysql-grafana-metrics-guide.md
 
 Stop:
   ./scripts/lab-down
@@ -313,14 +318,15 @@ Learn: Seata server console, client startup config, tx-service-group mapping.
 Open:
   Seata console: http://127.0.0.1:7091
   Nacos:         http://127.0.0.1:8848/nacos
+  MySQL:         127.0.0.1:3306  hotel_demo/hotel_demo_pass
 
 Verify:
   curl -s http://127.0.0.1:8082/actuator/health
   curl -s http://127.0.0.1:8084/actuator/health
 
 Note:
-  This lab does not start MySQL or execute a real AT transaction by default.
-  Use full mode only when you want the heavier hotel booking flow.
+  This lab starts MySQL-backed hotel/payment services but keeps the rest of the hotel chain down.
+  Use full mode only when you want the heavier end-to-end booking flow.
 
 Stop:
   ./scripts/lab-down
@@ -340,6 +346,7 @@ Open:
   RabbitMQ:  http://127.0.0.1:15672  guest/guest
   Kafka UI:  http://127.0.0.1:8090
   Seata:     http://127.0.0.1:7091
+  MySQL:     127.0.0.1:3306  hotel_demo/hotel_demo_pass
 
 Stop:
   ./scripts/lab-down
@@ -352,8 +359,10 @@ case "$LAB" in
   nacos|gateway)
     build_modules "gateway-service,user-service"
     stop_old_lab
-    docker compose --profile "$LAB" up -d nacos
+    docker compose --profile "$LAB" up -d nacos mysql
     wait_http "Nacos" "http://127.0.0.1:8848/nacos/v1/console/health/readiness" 60
+    wait_healthy "hotel-demo-mysql" 90
+    "$PWD/scripts/publish-app-configs-to-nacos.sh"
     docker compose --profile "$LAB" up -d --build user-service gateway-service
     wait_http "user-service" "http://127.0.0.1:8081/actuator/health" 60
     wait_http "gateway-service" "http://127.0.0.1:8080/actuator/health" 60
@@ -362,8 +371,9 @@ case "$LAB" in
     build_modules "gateway-service,mq-demo-bff-service,message-service"
     stop_old_lab
     # RabbitMQ lab 只启动 Nacos、RabbitMQ、Gateway、MQ demo BFF、message-service，避免无关服务占用内存。
-    docker compose --profile rabbitmq up -d nacos rabbitmq
+    docker compose --profile rabbitmq up -d nacos mysql rabbitmq
     wait_http "Nacos" "http://127.0.0.1:8848/nacos/v1/console/health/readiness" 60
+    wait_healthy "hotel-demo-mysql" 90
     "$PWD/scripts/publish-app-configs-to-nacos.sh"
     # RabbitMQ 先健康后再启动 Java 服务，否则启动初期容易看到连接失败重试日志。
     wait_healthy "hotel-demo-rabbitmq" 60
@@ -375,8 +385,9 @@ case "$LAB" in
   kafka)
     build_modules "gateway-service,mq-demo-bff-service,message-service"
     stop_old_lab
-    docker compose --profile kafka up -d nacos rabbitmq kafka
+    docker compose --profile kafka up -d nacos mysql rabbitmq kafka
     wait_http "Nacos" "http://127.0.0.1:8848/nacos/v1/console/health/readiness" 60
+    wait_healthy "hotel-demo-mysql" 90
     "$PWD/scripts/publish-app-configs-to-nacos.sh"
     wait_healthy "hotel-demo-rabbitmq" 60
     wait_healthy "hotel-demo-kafka" 90
@@ -390,8 +401,9 @@ case "$LAB" in
     stop_old_lab
     export MESSAGE_SERVICE_JAVA_TOOL_OPTIONS="${MESSAGE_SERVICE_JAVA_TOOL_OPTIONS:--XX:+UseG1GC -Xms192m -Xmx192m -XX:MaxGCPauseMillis=100 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xlog:gc*,safepoint:file=/tmp/message-service-g1-gc.log:time,uptime,level,tags:filecount=5,filesize=10M}"
     export HOTEL_JVM_GC_DEMO_MAX_RETAINED_BYTES="${HOTEL_JVM_GC_DEMO_MAX_RETAINED_BYTES:-134217728}"
-    docker compose --profile jvm-gc up -d nacos rabbitmq kafka prometheus grafana
+    docker compose --profile jvm-gc up -d nacos mysql rabbitmq kafka prometheus grafana
     wait_http "Nacos" "http://127.0.0.1:8848/nacos/v1/console/health/readiness" 60
+    wait_healthy "hotel-demo-mysql" 90
     "$PWD/scripts/publish-app-configs-to-nacos.sh"
     wait_healthy "hotel-demo-rabbitmq" 60
     wait_healthy "hotel-demo-kafka" 90
@@ -405,8 +417,10 @@ case "$LAB" in
   sentinel)
     build_modules "user-service"
     stop_old_lab
-    docker compose --profile sentinel up -d nacos sentinel-dashboard
+    docker compose --profile sentinel up -d nacos mysql sentinel-dashboard
     wait_http "Nacos" "http://127.0.0.1:8848/nacos/v1/console/health/readiness" 60
+    wait_healthy "hotel-demo-mysql" 90
+    "$PWD/scripts/publish-app-configs-to-nacos.sh"
     wait_http "Sentinel Dashboard" "http://127.0.0.1:8858" 60
     docker compose --profile sentinel up -d --build user-service
     wait_http "user-service" "http://127.0.0.1:8081/actuator/health" 60
@@ -433,8 +447,10 @@ case "$LAB" in
   seata)
     build_modules "hotel-service,payment-service"
     stop_old_lab
-    docker compose --profile seata up -d nacos seata-server
+    docker compose --profile seata up -d nacos mysql seata-server
     wait_http "Nacos" "http://127.0.0.1:8848/nacos/v1/console/health/readiness" 60
+    wait_healthy "hotel-demo-mysql" 90
+    "$PWD/scripts/publish-app-configs-to-nacos.sh"
     docker compose --profile seata up -d --build hotel-service payment-service
     wait_http "hotel-service" "http://127.0.0.1:8082/actuator/health" 60
     wait_http "payment-service" "http://127.0.0.1:8084/actuator/health" 60
@@ -445,8 +461,9 @@ case "$LAB" in
     echo "Building all Java modules..."
     mvn_cmd -B -DskipTests package
     stop_old_lab
-    docker compose --profile full up -d nacos sentinel-dashboard rabbitmq kafka seata-server
+    docker compose --profile full up -d nacos mysql sentinel-dashboard rabbitmq kafka seata-server
     wait_http "Nacos" "http://127.0.0.1:8848/nacos/v1/console/health/readiness" 60
+    wait_healthy "hotel-demo-mysql" 90
     "$PWD/scripts/publish-app-configs-to-nacos.sh"
     wait_healthy "hotel-demo-rabbitmq" 60
     wait_healthy "hotel-demo-kafka" 90

@@ -438,7 +438,7 @@ curl -s http://127.0.0.1:8084/actuator/health
 
 降级说明：
 
-当前项目原本为了轻量学习没有引入 MySQL，业务数据是内存数据。因此 `seata` lab 默认不启动数据库、不创建 AT 模式 `undo_log`，也不跑真实数据库分布式事务。它是 4GB 机器上的 Seata 观察版：先学习 Seata Server、客户端配置和事务组映射。真正的 AT 事务实验建议后续单独加 MySQL + 两张测试表 + `undo_log`，不要和 Kafka、完整酒店链路一起跑。
+当前项目已经接入 MySQL，`seata` lab 会启动 MySQL-backed 的 hotel/payment 服务，便于观察数据库连接和基础业务写入。它仍然是 4GB 机器上的 Seata 观察版：先学习 Seata Server、客户端配置和事务组映射，暂不创建 AT 模式 `undo_log`，也不跑完整数据库分布式事务。
 
 停止：
 
@@ -500,7 +500,7 @@ Seata:     http://127.0.0.1:7091
 4. `kafka`：理解 topic、partition、offset、consumer。
 5. `sentinel`：理解资源名、流控规则、限流后的 fallback。
 6. `sentinel-chain`：看 Gateway、Web、Feign 三类 Sentinel 资源在面板上的样子。
-7. `seata`：先看配置和控制台，再决定是否追加 MySQL 做真实 AT 事务。
+7. `seata`：先看配置、控制台和 MySQL-backed 服务，再决定是否追加 `undo_log` 做真实 AT 事务。
 8. `full`：最后再看完整酒店预订链路如何把这些组件串起来。
 
 ## 版本

@@ -46,3 +46,19 @@ scrape_configs:
           - message-service:8085
         labels:
           instance: message-service
+      - targets:
+          - user-service:8081
+        labels:
+          instance: user-service
+      - targets:
+          - hotel-service:8082
+        labels:
+          instance: hotel-service
+      - targets:
+          - order-service:8083
+        labels:
+          instance: order-service
+      - targets:
+          - payment-service:8084
+        labels:
+          instance: payment-service

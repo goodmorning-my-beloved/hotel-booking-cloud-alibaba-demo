@@ -145,9 +145,9 @@ kafka_demo_processed_message(message_id primary key)
 kafka_demo_order_projection
 ```
 
-去重记录和模拟业务投影在同一个 H2 本地事务中提交，成功后消费者才提交 Kafka offset。服务重启后去重记录仍然存在。
+去重记录和模拟业务投影在同一个 MySQL 本地事务中提交，成功后消费者才提交 Kafka offset。服务重启后去重记录仍然存在。
 
-生产环境应该把它们换成业务 MySQL 表，并优先使用数据库唯一约束。仅用 Redis `SETNX` 时必须额外考虑 Redis 成功但数据库事务失败的状态不一致。
+生产环境也应该优先使用业务 MySQL 表和数据库唯一约束。仅用 Redis `SETNX` 时必须额外考虑 Redis 成功但数据库事务失败的状态不一致。
 
 ### 6. 失败重试和 DLT
 
@@ -340,7 +340,7 @@ lag 是最新消息位置和 group 已提交位置之间的差距。它反映消
 | producer ACK、幂等、重试时间边界 | normal 与 producer 配置 |
 | batch、linger、压缩 | async-batch |
 | 手动提交、at-least-once、lag | consumer 与 pause/resume |
-| 数据库幂等 | duplicate、两张 H2 表 |
+| 数据库幂等 | duplicate、两张 MySQL 表 |
 | 阻塞重试、异常分类、DLT | dead-letter |
 | 反序列化 poison message | poison、`ErrorHandlingDeserializer` |
 | DLT 工单和人工闭环 | `kafka_demo_dlt_incident` |

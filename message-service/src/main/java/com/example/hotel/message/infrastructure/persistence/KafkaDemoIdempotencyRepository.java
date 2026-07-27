@@ -44,9 +44,8 @@ public class KafkaDemoIdempotencyRepository implements KafkaDemoIdempotencyStore
                         Timestamp.from(now));
 
                 jdbcTemplate.update("""
-                                MERGE INTO kafka_demo_order_projection
+                                INSERT INTO kafka_demo_order_projection
                                 (order_id, message_id, business_key, amount, updated_at)
-                                KEY (order_id)
                                 VALUES (?, ?, ?, ?, ?)
                                 """,
                         message.orderId(),
@@ -57,7 +56,23 @@ public class KafkaDemoIdempotencyRepository implements KafkaDemoIdempotencyStore
             });
             return true;
         } catch (DuplicateKeyException duplicate) {
-            return false;
+            try {
+                transactionTemplate.executeWithoutResult(status -> {
+                    jdbcTemplate.update("""
+                                    INSERT INTO kafka_demo_processed_message
+                                    (message_id, order_id, business_key, processed_at)
+                                    VALUES (?, ?, ?, ?)
+                                    """,
+                            message.messageId(),
+                            message.orderId(),
+                            message.businessKey(),
+                            Timestamp.from(Instant.now()));
+                    updateProjection(message);
+                });
+                return true;
+            } catch (DuplicateKeyException processedDuplicate) {
+                return false;
+            }
         }
     }
 
@@ -71,5 +86,18 @@ public class KafkaDemoIdempotencyRepository implements KafkaDemoIdempotencyStore
                         """,
                 (rs, rowNum) -> rs.getString("message_id"),
                 limit);
+    }
+
+    private void updateProjection(KafkaDemoMessage message) {
+        jdbcTemplate.update("""
+                        UPDATE kafka_demo_order_projection
+                        SET message_id = ?, business_key = ?, amount = ?, updated_at = ?
+                        WHERE order_id = ?
+                        """,
+                message.messageId(),
+                message.businessKey(),
+                message.amount(),
+                Timestamp.from(Instant.now()),
+                message.orderId());
     }
 }
